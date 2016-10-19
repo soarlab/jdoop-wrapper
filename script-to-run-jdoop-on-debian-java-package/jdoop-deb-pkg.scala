@@ -127,14 +127,13 @@ object runJDoop {
   def unpackJars(jars: Set[File], dir: Path): Unit = {
     /** Unpacks one JAR file */
     def unpackJar(jar: File) {
-      val jarDir = new File(dir + File.separator + jar.getName)
       val jar_ = new JarFile(jar)
       /** Process a single entry in a JAR file. For a regular file it means
         * copying to a destination directory, and for a directory it
         * means creating it. */
       def processEntry(entry: JarEntry): Unit = {
         if (!entry.isDirectory) {
-          val outFile = new File(jarDir + File.separator + entry.getName)
+          val outFile = new File(dir + File.separator + entry.getName)
           // make sure to create potentially non-existent parent directories
           (new File(outFile.getParent)).mkdirs()
 
@@ -256,9 +255,13 @@ object runJDoop {
       installBinPkg(binPkgName)
       val tmpDir = createTmpDir()
       println(tmpDir)
-      unpackJars(getBinPkgJars(binPkgName), tmpDir)
-      println("Java package name: " +
-        getJavaPackageName(getBinPkgJars(binPkgName).toSeq.apply(0)))
+      val jars = getBinPkgJars(binPkgName)
+      println("This many jars: " + jars.size)
+      if (jars.size > 0) {
+        unpackJars(getBinPkgJars(binPkgName), tmpDir)
+        println("Java package name: " +
+          getJavaPackageName(getBinPkgJars(binPkgName).toSeq.apply(0)))
+      }
     }
   }
 }
