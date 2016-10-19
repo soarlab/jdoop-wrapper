@@ -95,7 +95,7 @@ object runJDoop {
     val shellOut = ("dpkg --listfiles " + binPkgName) lines_! ProcessLogger(
       (o: String) => ())
     shellOut.filter { l =>
-      // jars can be in /usr/lib and in /usr/share/java
+      // jars can be under /usr/lib and /usr/share
       l.startsWith("/usr") && l.endsWith(".jar") }
       .map { new File(_) }
       .filter { f => !Files.isSymbolicLink(f.toPath) }
@@ -124,18 +124,20 @@ object runJDoop {
     * @param jars A set of JAR files to unpack
     * @param dir A directory to unpack to
     */
-  def unpackJars(jars: Set[File], dir: Path) {
+  def unpackJars(jars: Set[File], dir: Path): Unit = {
     /** Unpacks one JAR file */
     def unpackJar(jar: File) {
+      val jarDir = new File(dir + File.separator + jar.getName)
       val jar_ = new JarFile(jar)
       /** Process a single entry in a JAR file. For a regular file it means
         * copying to a destination directory, and for a directory it
         * means creating it. */
-      def processEntry(entry: JarEntry) {
-        val outFile = new File(dir + File.separator + entry.getName)
-        if (entry.isDirectory)
-          outFile.mkdir()
-        else {
+      def processEntry(entry: JarEntry): Unit = {
+        if (!entry.isDirectory) {
+          val outFile = new File(jarDir + File.separator + entry.getName)
+          // make sure to create potentially non-existent parent directories
+          (new File(outFile.getParent)).mkdirs()
+
           val is = jar_.getInputStream(entry)
           val fos = new FileOutputStream(outFile)
           while (is.available > 0)
