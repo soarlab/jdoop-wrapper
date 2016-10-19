@@ -1,6 +1,4 @@
-#!/bin/bash
-exec scala -nowarn "$0" "$@"
-!#
+#!/usr/bin/env scala
 
 import java.io.{File, FileOutputStream}
 import java.nio.file.{Files, Path}
@@ -29,8 +27,12 @@ object runJDoop {
       .split(": ")(1).split("-")(0)
   }
 
-  def getSrcPkgDir(srcPkgName: String): String =
-    srcPkgName + "-" + getSrcPkgVer(srcPkgName)
+  def getSrcPkgDir(srcPkgName: String): String = {
+    val v = getSrcPkgVer(srcPkgName)
+    srcPkgName + "-" + (
+      if (v.contains(':')) v.substring(v.indexOf(':') + 1) else v
+    )
+  }
 
   def downloadSrcPkg(srcPkgName: String): Int = {
     ("apt-get source " + srcPkgName) ! ProcessLogger(
@@ -51,8 +53,8 @@ object runJDoop {
     val matching = currentDirFiles.filter(
       f => r.findFirstIn(f.getName).isDefined)
       .toStream
-    matching append currentDirFiles.filter(_.isDirectory)
-      .flatMap(recursiveListFiles(_, r))
+    matching.append(currentDirFiles.filter(_.isDirectory)
+      .flatMap(recursiveListFiles(_, r)))
   }
 
   /**
@@ -89,7 +91,7 @@ object runJDoop {
     * @param binPkgName The name of the Debian binary package to search
     * @return A set of JAR files
     */
-  def binPkgJarFiles(binPkgName: String): Set[File] = {
+  def getBinPkgJars(binPkgName: String): Set[File] = {
     val shellOut = ("dpkg --listfiles " + binPkgName) lines_! ProcessLogger(
       (o: String) => ())
     shellOut.filter { l =>
@@ -100,15 +102,13 @@ object runJDoop {
   }
 
   /**
-    * Gets JAR manifest entries
+    * Gets JAR entries
     * 
-    * @param jar The JAR file to get manifest entries from
-    * @return A sequence of JAR manifest entries
+    * @param jar The JAR file to get entries from
+    * @return A sequence of JAR entries
     */
-  def getJarManifestEntries(jar: File): Seq[JarEntry] = {
-    import scala.collection.mutable.ArrayBuffer
-
-    val buf = new ArrayBuffer[JarEntry]
+  def getJarEntries(jar: File): Seq[JarEntry] = {
+    val buf = new scala.collection.mutable.ArrayBuffer[JarEntry]
     val jar_ = new JarFile(jar)
     val enum = jar_.entries()
     while (enum.hasMoreElements)
@@ -124,8 +124,12 @@ object runJDoop {
     * @param dir A directory to unpack to
     */
   def unpackJars(jars: Set[File], dir: Path) {
+    /** Unpacks one JAR file */
     def unpackJar(jar: File) {
       val jar_ = new JarFile(jar)
+      /** Process a single entry in a JAR file. For a regular file it means
+        * copying to a destination directory, and for a directory it
+        * means creating it. */
       def processEntry(entry: JarEntry) {
         val outFile = new File(dir + File.separator + entry.getName)
         if (entry.isDirectory)
@@ -140,24 +144,45 @@ object runJDoop {
         }
       }
 
-      getJarManifestEntries(jar) foreach { processEntry }
-      // val enum = jar.entries()
-      // while (enum.hasMoreElements) {
-      //   val elem = enum.nextElement()
-      //   val outFile = new File(dir + File.separator + elem.getName)
-      //   if (elem.isDirectory)
-      //     outFile.mkdir()
-      //   else {
-      //     val is = jar.getInputStream(elem)
-      //     val fos = new FileOutputStream(outFile)
-      //     while (is.available > 0)
-      //       fos.write(is.read())
-      //     fos.close()
-      //     is.close()
-      //   }
-      // }
+      getJarEntries(jar) foreach { processEntry }
     }
-    jars foreach { unpackJar(_) }
+    jars foreach { unpackJar }
+  }
+
+  /**
+    * Gets a Java sub-package name from a path
+    * @param path A path to a file (e.g., .java, .class)
+    * @param depth The depth of the package name, this many from the top
+    * @return The Java package name of the file based on its path
+    */
+  def getSubPkgName(path: String, depth: Int = 1): String = {
+    require(depth > 0)
+    path
+      .split("/")
+      // consider replacing last with lastOption. Same elsewhere where
+      // I access the (0) element of a sequence
+      .dropRight(if (path.split("/").last.contains('.')) 1 else 0)
+      .take(depth)
+      .mkString(".")
+  }
+
+  /**
+    * Returns a collection of file paths normalized to package names
+    * that are grouped by common package name prefixes determined
+    * by a depth parameter.
+    * 
+    * @param files A sequence of file paths
+    * @param depth The depth of package name groups to be taken
+    * @return A grouped collection of packages corresponding to the files
+    */
+  def groupByPkg(files: Seq[String], depth: Int = 1): Seq[Seq[String]] = {
+    require(depth > 0)
+
+    files.map { getSubPkgName(_, depth) }
+      .groupBy(p => p)
+      .values
+      .toSeq
+      .sortBy(-_.length)
   }
 
   /**
@@ -167,11 +192,36 @@ object runJDoop {
     * @param jar The JAR file to extract the name from
     * @return The fully qualified name of the Java package
     */
-  def getJavaPackageName(jar: JarFile): String = {
+  def getJavaPackageName(jar: File): String = {
     def guessFromDirStruct: String = {
-      "TODO, i.e. to be figured out"
+      val classFiles = getJarEntries(jar).filter {
+        _.getName.endsWith(".class") }
+        .map { _.toString }
+
+      val s = Stream.from(1).map { groupByPkg(classFiles, _) }
+      val rootPkgs = s(0)
+
+      rootPkgs.length match {
+        // Either all classes are in the same root package so find the
+        // longest common prefix...
+        case 1 =>
+          val sWithIndices = s zipWithIndex
+          val commonPrefix = sWithIndices takeWhile{ pkgs =>
+            pkgs._1.length == 1 &&
+            (pkgs._2 match {
+              case 0 => true
+              case i => sWithIndices(i - 1)._1 != pkgs._1
+            })
+          }
+          commonPrefix.last._1(0)(0)
+        // ... or there is more than one root package so return one
+        // with the most classes in it. All packages not returned here
+        // will not be tested by JDoop.
+        case n => rootPkgs(0)(0)
+      }
     }
-    val manifest = jar.getManifest
+
+    val manifest = new JarFile(jar).getManifest
     // an immutable map; it would have been a mutable one without .toMap
     val entryMap = manifest.getEntries.asScala.toMap
     entryMap.keySet.toSeq match {
@@ -181,7 +231,18 @@ object runJDoop {
   }
 
   def main(args: Array[String]) {
-    val testPkgs = List("libxom-java", "libglazedlists-java", "libmapscript-java")
+    // val testPkgs = List("libxom-java", "libglazedlists-java", "libmapscript-java")
+    val testPkgs = Seq(
+      // "libswingx1-java",
+      "libswt-gtk-3-java")// ,
+      // "libtomcat7-java",
+      // "libtrilead-ssh2-java",
+      // "libvecmath-java",
+      // "libvldocking-java",
+      // "libwagon-java",
+      // "libwagon2-java",
+      // "libxalan2-java")
+
     for (binPkgName <- testPkgs) {
       println("======================================")
       println("Binary package: " + binPkgName)
@@ -192,9 +253,9 @@ object runJDoop {
       installBinPkg(binPkgName)
       val tmpDir = createTmpDir()
       println(tmpDir)
-      unpackJars(binPkgJarFiles(binPkgName), tmpDir)
+      unpackJars(getBinPkgJars(binPkgName), tmpDir)
       println("Java package name: " +
-        getJavaPackageName(new JarFile(binPkgJarFiles(binPkgName).toSeq.apply(0))))
+        getJavaPackageName(getBinPkgJars(binPkgName).toSeq.apply(0)))
     }
   }
 }
