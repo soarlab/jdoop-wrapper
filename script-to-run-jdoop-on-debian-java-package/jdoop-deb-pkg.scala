@@ -24,14 +24,12 @@ object runJDoop {
     val shellOut = ("apt-cache showsrc " + srcPkgName) lines_! ProcessLogger(
       (o: String) => ())
     shellOut.dropWhile(!_.startsWith("Version: "))(0)
-      .split(": ")(1).split("-")(0)
+      .split(": ")(1).split("-").dropRight(1).mkString("-")
   }
 
   def getSrcPkgDir(srcPkgName: String): String = {
     val v = getSrcPkgVer(srcPkgName)
-    srcPkgName + "-" + (
-      if (v.contains(':')) v.substring(v.indexOf(':') + 1) else v
-    )
+    srcPkgName + "-" + v.substring(v.indexOf(':') + 1)
   }
 
   def downloadSrcPkg(srcPkgName: String): Int = {
@@ -67,7 +65,7 @@ object runJDoop {
       """.*\.java""".r)
       .map { _.toString.substring((dir + File.separator).length) }
     val srcDirMap = javaFiles groupBy { f =>
-      f.substring(0, f.indexOf(File.separator)) }
+      f.substring(0, f.indexOf(File.separator) max 0) }
     val fileCountMap = srcDirMap map { kv => (kv._1, kv._2.length) }
     val mainSrcDir = fileCountMap.toSeq.sortBy(_._2).last._1
     Seq("main" + File.separator + "java", "java", "").map { d: String =>
@@ -80,6 +78,10 @@ object runJDoop {
   }
 
   def createTmpDir(): Path = Files.createTempDirectory("jdoop-")
+
+  def installBuildDeps(srcPkgName: String): Unit =
+    ("sudo apt-get build-dep --assume-yes " + srcPkgName) ! ProcessLogger(
+      (o: String) => (), (e: String) => ())
 
   def installBinPkg(binPkgName: String): Int =
     ("sudo apt-get install --assume-yes " + binPkgName) ! ProcessLogger(
