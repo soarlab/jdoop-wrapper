@@ -95,7 +95,8 @@ object runJDoop {
     val shellOut = ("dpkg --listfiles " + binPkgName) lines_! ProcessLogger(
       (o: String) => ())
     shellOut.filter { l =>
-      l.startsWith("/usr/share/java") && l.endsWith(".jar") }
+      // jars can be in /usr/lib and in /usr/share/java
+      l.startsWith("/usr") && l.endsWith(".jar") }
       .map { new File(_) }
       .filter { f => !Files.isSymbolicLink(f.toPath) }
       .toSet
