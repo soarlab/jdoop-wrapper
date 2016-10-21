@@ -32,10 +32,54 @@ object runJDoop {
     srcPkgName + "-" + v.substring(v.indexOf(':') + 1)
   }
 
+  /**
+    * Gets a set of names of binary packages that a source package builds.
+    *
+    * @param srcPkgName The name of the input source package
+    * @return A set of binary package names that the source package builds
+    */
+  def getSrcBinPkgs(srcPkgName: String): Set[String] = {
+    val shellOut = ("apt-cache showsrc " + srcPkgName) lines_! ProcessLogger(
+      (o: String) => ())
+    shellOut.dropWhile(!_.startsWith("Binary: "))(0)
+      .split(": ")(1).split(",").map{_.trim}.toSet
+  }
+
   def downloadSrcPkg(srcPkgName: String): Int = {
     ("apt-get source " + srcPkgName) ! ProcessLogger(
       (o: String) => (), (e: String) => ())
   }
+
+  def installBuildDeps(srcPkgName: String): Int = {
+    ("sudo apt-get build-dep --assume-yes " + srcPkgName) ! ProcessLogger(
+      (o: String) => (), (e: String) => ())
+  }
+
+  /**
+    * Builds a Debian source package.
+    *
+    * This function assumes the package has been downloaded already.
+    *
+    * @param srcPkgName The source package to build
+    */
+  def buildSrcPkg(srcPkgName: String) = {
+    require(new File(getSrcPkgDir(srcPkgName)).isDirectory())
+
+    Process(
+      Seq("fakeroot", "debian/rules", "build"),
+      new File(getSrcPkgDir(srcPkgName)),       // The directory to
+                                                // execute the command
+                                                // in.
+      "DEB_BUILD_OPTIONS" -> "nocheck"          // env vars
+    ).!!
+  }
+
+  def installBinPkgs(binPkgNames: Set[String]): Int =
+    ("sudo apt-get install --assume-yes " +
+      binPkgNames.mkString(" ")) ! ProcessLogger(
+      (o: String) => (), (e: String) => ())
+
+  def installBinPkg(binPkgName: String): Int = installBinPkgs(Set(binPkgName))
 
   /**
     *  Recursively searches all files matching a regular expression.
@@ -56,14 +100,6 @@ object runJDoop {
   }
 
   def createTmpDir(): Path = Files.createTempDirectory("jdoop-")
-
-  def installBuildDeps(srcPkgName: String): Unit =
-    ("sudo apt-get build-dep --assume-yes " + srcPkgName) ! ProcessLogger(
-      (o: String) => (), (e: String) => ())
-
-  def installBinPkg(binPkgName: String): Int =
-    ("sudo apt-get install --assume-yes " + binPkgName) ! ProcessLogger(
-      (o: String) => (), (e: String) => ())
 
   /**
     * Finds all JAR files within a Debian binary package
@@ -355,11 +391,17 @@ object runJDoop {
       println("======================================")
       println("Source package: " + srcPkgName)
       downloadSrcPkg(srcPkgName)
-      // installBuildDeps(srcPkgName)
+      println("Installing build dependencies...")
+      installBuildDeps(srcPkgName)
       val (javaDir, fqdn) = getSourceInfo(srcPkgName)
       println("Java src dir = " + javaDir)
       println("FQDN         = " + fqdn)
 
+      println("Building the package...")
+      buildSrcPkg(srcPkgName)
+      val buildPkgs = getSrcBinPkgs(srcPkgName)
+      println("Builds: " + buildPkgs)
+      installBinPkgs(buildPkgs)
       // installBinPkg(binPkgName)
       // val tmpDir = createTmpDir()
       // println(tmpDir)
