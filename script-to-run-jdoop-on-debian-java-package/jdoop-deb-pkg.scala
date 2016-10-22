@@ -9,7 +9,35 @@ import scala.util.matching.Regex
 import Stream._
 import sys.process._
 
-object runJDoop {
+case class SourcePackage(
+  val srcPkgName: String,
+  val pkgDir: String,
+  val srcDir: String,
+  val binDir: String,
+  val fqdn: String,
+  val buildsBinPkgs: Set[String]) {
+
+  private val xml =
+    <source-package name={srcPkgName}>
+      <pkg-dir>{pkgDir}</pkg-dir>
+      <src-dir>{srcDir}</src-dir>
+      <bin-dir>{binDir}</bin-dir>
+      <fqdn>{fqdn}</fqdn>
+      <builds>{
+        for(pkg <- buildsBinPkgs)
+        yield <bin-pkg>{pkg}</bin-pkg>
+      }</builds>
+  </source-package>
+
+  def toXML: String = {
+    // max width: 80 chars
+    // indent:     2 spaces
+    val printer = new scala.xml.PrettyPrinter(80, 2)
+    printer.format(xml)
+  }
+}
+
+object processPackages {
 
   // A list of common directory structures for a source code tree
   val srcSeq = List(
@@ -423,6 +451,7 @@ object runJDoop {
   }
 
   def main(args: Array[String]) {
+
     val source = scala.io.Source.fromFile(args(0))
     val testPkgs = try source.mkString.split("\n").toSeq finally source.close()
 
@@ -438,11 +467,22 @@ object runJDoop {
 
       println("Building the package...")
       buildSrcPkg(srcPkgName)
-      val buildPkgs = getSrcBinPkgs(srcPkgName)
-      println("Builds: " + buildPkgs)
-      installBinPkgs(buildPkgs)
+      val buildsPkgs = getSrcBinPkgs(srcPkgName)
+      println("Builds: " + buildsPkgs)
+      installBinPkgs(buildsPkgs)
       val binDir = getJavaBinDir(srcPkgName)
       println("Class dir = " + binDir)
+
+      val sp = SourcePackage(
+        srcPkgName,
+        getSrcPkgDir(srcPkgName),
+        javaDir,
+        binDir.toString,
+        fqdn,
+        buildsPkgs)
+      println(sp.toXML)
     }
   }
 }
+
+processPackages.main(args)
