@@ -11,6 +11,31 @@ import sys.process._
 
 object runJDoop {
 
+  // A list of common directory structures for a source code tree
+  val srcSeq = List(
+    List("src", "main", "java"),
+    List("src", "java", "main"),
+    List("src", "java"),
+    List("main", "java"),
+    List("main"),
+    List("java"),
+    List("src"),
+    List("")
+  )
+  // A list of common directory structures for a source code tree
+  val binSeq = List(
+    List("build", "classes", "main"),
+    List("build", "classes"),
+    List("output", "build"),
+    List("dist", "classes"),
+    List("classes"),
+    List("target"),
+    List("output"),
+    List("build"),
+    List("bin"),
+    List("")
+  )
+
   def getSrcPkgName(binPkgName: String): String = {
     val shellOut = ("apt-cache show " + binPkgName) lines_! ProcessLogger(
       (o: String) => ())
@@ -179,7 +204,7 @@ object runJDoop {
       .split("/")
       // consider replacing last with lastOption. Same elsewhere where
       // I access the (0) element of a sequence
-      .dropRight(if (path.split("/").last.contains('.')) 1 else 0)
+      .dropRight(if (path.split(File.separator).last.contains('.')) 1 else 0)
       .take(depth)
       .mkString(".")
   }
@@ -256,71 +281,96 @@ object runJDoop {
   }
 
   /**
+    * Finds the longest common directory structure for Java projects
+    *
+    * @param topDir the top directory that contains the project
+    * @param startDir the directory where the search starts from
+    * @param prefixes a list of common directory structure prefixes
+    * @return The longest common directory structure
+    */
+  def longestDirPrefix(
+    topDir: String,
+    startDir: String,
+    prefixes: List[List[String]]): File = {
+    prefixes.map { d: List[String] =>
+      val newDir: String =
+        startDir + File.separator + d.mkString(File.separator)
+      (newDir, (new File(topDir + File.separator + newDir)).exists)
+    }
+      .filter { _._2 }
+      .map { p => new File(p._1) }
+      .apply(0)
+  }
+
+  /**
+    * Determines the root of files defined by a regular expression for
+    * an unpacked Debian Java source package.
+    *
+    * @param the name of the source package
+    * @param the regular expression that matches files
+    * @param prefixes a list of common directory structure prefixes
+    * @return The directory where the files are
+    */
+  def getJavaDir(
+    srcPkgName: String,
+    r: Regex,
+    prefixes: List[List[String]]): File = {
+    /**
+      * Determines the best source directory candidate starting at a
+      * given directory.
+      *
+      * @param dir The root directory where to search
+      * @return The best candidate for the source directory
+      */
+    def bestDirCandidate(dir: String): String = {
+      val files = recursiveListFiles(new File(dir), r)
+        .map { _.toString.substring((dir + File.separator).length) }
+      val dirMap = files groupBy { f =>
+        f.substring(0, f.indexOf(File.separator) max 0) }
+      val fileCountMap = dirMap map { kv => (kv._1, kv._2.length) }
+      fileCountMap.toSeq.sortBy(_._2).last._1
+    }
+
+    val dir = getSrcPkgDir(srcPkgName)
+    val mainDir: String = bestDirCandidate(dir)
+    val candidateResult: File = longestDirPrefix(dir, mainDir, prefixes)
+    // make sure we are not getting into an empty directory
+    if (recursiveListFiles(
+      new File(dir + File.separator + candidateResult.toString), r).size == 0)
+      new File(mainDir)
+    else
+      candidateResult
+  }
+
+  /**
+    * Determines the root of .java files for an unpacked Debian Java
+    * source package
+    *
+    * @param sercPkgName The name of the source package
+    * @return The root directory
+    */
+  def getJavaSrcDir(srcPkgName: String): File =
+    getJavaDir(srcPkgName, """.*\.java""".r, srcSeq)
+
+  /**
+    * Determines the root of .class files for an unpacked Debian Java
+    * source package
+    *
+    * @param sercPkgName The name of the source package
+    * @return The root directory
+    */
+  def getJavaBinDir(srcPkgName: String): File =
+    getJavaDir(srcPkgName, """.*\.class""".r, binSeq)
+
+  /**
     * Returns a pair representing a Java source directory and the
     * fully qualified domain name of the Java project in that source
     * directory.
+    *
+    * @param srcPkgName The name of the source package
+    * @return The pair consisting of the source directory and the FQDN
     */
   def getSourceInfo(srcPkgName: String): (String, String) = {
-    // A list of common directory structures for a source code tree
-    val seq = List(
-      List("src", "main", "java"),
-      List("src", "java", "main"),
-      List("src", "java"),
-      List("main", "java"),
-      List("main"),
-      List("java"),
-      List("src"),
-      List("")
-    )
-    /**
-      * Finds the longest common directory structure for Java projects
-      */
-    def longestDirPrefix(topDir: String, srcDir: String): File = {
-      seq.map { d: List[String] =>
-        val nd: String =
-          srcDir + File.separator + d.mkString(File.separator)
-        (nd, (new File(topDir + File.separator + nd)).exists)
-      }
-        .filter { _._2 }
-        .map { p => new File(p._1) }
-        .apply(0)
-    }
-
-    /**
-      * Determines the root of .java files for an unpacked Debian Java
-      * source package
-      */
-    def getJavaSrcDir: File = {
-      /**
-        * Determines the best source directory candidate starting at a
-        * given directory.
-        *
-        * @param dir The root directory where to search
-        * @return The best candidate for the source directory
-        */
-      def bestDirCandidate(dir: String): String = {
-        val javaFiles = recursiveListFiles(new File(dir),
-          """.*\.java""".r)
-          .map { _.toString.substring((dir + File.separator).length) }
-        val srcDirMap = javaFiles groupBy { f =>
-          f.substring(0, f.indexOf(File.separator) max 0) }
-        val fileCountMap = srcDirMap map { kv => (kv._1, kv._2.length) }
-        fileCountMap.toSeq.sortBy(_._2).last._1
-      }
-
-      val dir = getSrcPkgDir(srcPkgName)
-      val mainSrcDir: String = bestDirCandidate(dir)
-      val candidateResult: File = longestDirPrefix(dir, mainSrcDir)
-      // make sure we are not getting into an empty directory
-      if (recursiveListFiles(
-        new File(dir + File.separator + candidateResult.toString),
-        """.*\.java""".r)
-        .size == 0)
-        new File(mainSrcDir)
-      else
-        candidateResult
-    }
-
     /**
       * Gets the fully qualified domain name of the main Java package in
       * a given source package
@@ -350,7 +400,7 @@ object runJDoop {
         (javaDir, fqdn)
     }
 
-    val javaDirLvl1 = getJavaSrcDir.toString
+    val javaDirLvl1 = getJavaSrcDir(srcPkgName).toString
     val fqdnLvl1    = getJavaPackageName(javaDirLvl1)
 
     val (javaDirLvl2, fqdnLvl2) =
@@ -364,7 +414,7 @@ object runJDoop {
         (javaDirLvl1, fqdnLvl1)
 
     // check if any usual directory levels are still in the FQDN part
-    val (javaDirLvl3, _) = seq.dropRight(1) // drop the empty string at the end
+    val (javaDirLvl3, _) = srcSeq.dropRight(1) // drop the empty string at the end
       .foldLeft(
       (javaDirLvl2, fqdnLvl2)){
       (tuple, sneakyFqdn) => extendWithSneaky(tuple, sneakyFqdn)}
@@ -376,17 +426,6 @@ object runJDoop {
     val source = scala.io.Source.fromFile(args(0))
     val testPkgs = try source.mkString.split("\n").toSeq finally source.close()
 
-    // a new flow based on starting with source packages
-    //
-    // For a given source package named srcPkgName, do:
-    //
-    // - downloadSrcPkg(srcPkgName)
-    // - install its build dependencies: sudo apt-get build-dep <srcPkgName>
-    // - build the source package: DEB_BUILD_OPTIONS=nocheck fakeroot debian/rules build
-    // - install all binary packages it builds, just in case (get that
-    //   info from its .dsc file)
-    // - figure out where are .class files
-    // - figure out the java package name just like with getJavaPackageName
     for (srcPkgName <- testPkgs) {
       println("======================================")
       println("Source package: " + srcPkgName)
@@ -402,16 +441,8 @@ object runJDoop {
       val buildPkgs = getSrcBinPkgs(srcPkgName)
       println("Builds: " + buildPkgs)
       installBinPkgs(buildPkgs)
-      // installBinPkg(binPkgName)
-      // val tmpDir = createTmpDir()
-      // println(tmpDir)
-      // val jars = getBinPkgJars(binPkgName)
-      // println("This many jars: " + jars.size)
-      // if (jars.size > 0) {
-      //   unpackJars(getBinPkgJars(binPkgName), tmpDir)
-      //   println("Java package name: " +
-      //     getJavaPackageName(getBinPkgJars(binPkgName).toSeq.apply(0)))
-      // }
+      val binDir = getJavaBinDir(srcPkgName)
+      println("Class dir = " + binDir)
     }
   }
 }
