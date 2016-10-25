@@ -175,21 +175,10 @@ write_sourceslist()
         prefix="deb [arch=${arch}]"
     fi
 
-    if [ "$mainonly" = 1 ]; then
-      non_main=''
-    else
-      non_main=' contrib non-free'
-    fi
-
     cat >> "${rootfs}/etc/apt/sources.list" << EOF
-${prefix} $MIRROR          ${release}         main${non_main}
+${prefix} $MIRROR          ${release}         main
+deb-src   $MIRROR          ${release}         main
 EOF
-
-    if [ "$release" != "unstable" -a "$release" != "sid" ]; then
-      cat >> "${rootfs}/etc/apt/sources.list" << EOF
-${prefix} $SECURITY_MIRROR ${release}/updates main${non_main}
-EOF
-    fi
 }
 
 install_packages()
@@ -197,7 +186,13 @@ install_packages()
     local rootfs="$1"; shift
     local packages="$*"
 
-    chroot "${rootfs}" apt-get update
+    # Make sure to use:
+    #
+    # -o Acquire::Check-Valid-Until=false
+    #
+    # in order to avoid the update failing, which can happen with
+    # outdated Debian Snapshot archives.
+    chroot "${rootfs}" apt-get -o Acquire::Check-Valid-Until=false update
     if [ -n "${packages}" ]; then
         chroot "${rootfs}" apt-get install --force-yes -y --no-install-recommends ${packages}
     fi
@@ -517,18 +512,18 @@ Options :
                          environment variable (see below).
   --security-mirror=SECURITY_MIRROR
                          Debian mirror to use for security updates. Overrides the
-                         SECURITY_MIRROR environment variable (see below).
+                         SECURITY_MIRROR environment variable (see below). Not used.
   --packages=PACKAGE_NAME1,PACKAGE_NAME2,...
                          List of additional packages to install. Comma separated, without space.
   -c, --clean            only clean up the cache and terminate
-  --enable-non-free      include also Debian's contrib and non-free repositories.
+  --enable-non-free      include also Debian's contrib and non-free repositories. Has no effect.
 
 Environment variables:
 
   MIRROR                 The Debian package mirror to use. See also the --mirror switch above.
                          Defaults to '$MIRROR'
   SECURITY_MIRROR        The Debian package security mirror to use. See also the --security-mirror switch above.
-                         Defaults to '$SECURITY_MIRROR'
+                         Defaults to '$SECURITY_MIRROR'. Not used.
 
 EOF
     return 0
@@ -568,7 +563,7 @@ do
 
         -a|--arch)            arch=$2; shift 2;;
         -c|--clean)           clean=1; shift 1;;
-           --enable-non-free) mainonly=0; shift 1;;
+           --enable-non-free) shift 1;;
            --mirror)          MIRROR=$2; shift 2;;
         -n|--name)            name=$2; shift 2;;
            --packages)        packages=$2; shift 2;;
