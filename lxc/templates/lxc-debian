@@ -185,7 +185,6 @@ EOF
 ${prefix} $SECURITY_MIRROR ${release}/updates main
 EOF
     fi
-EOF
 }
 
 install_packages()
