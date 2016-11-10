@@ -10,19 +10,13 @@ in_container() {
 
 [ -z "$1" ] && echo "A base container name missing" && exit 1
 [ -z "$2" ] && echo "A destination container name missing" && exit 1
-[ -z "$Z3_DIR" ] && echo "The Z3_DIR environment variable wasn't passed in" && exit 1
 
 BASE=$1
 sudo lxc-info --name $BASE --state > /dev/null
 
 NEW=$2
 
-LXC_Z3=/z3
-# TODO: This mounting will not work. Mounting works only in ephemeral
-# containers, but I can't make copies of ephemeral containers later
-# on. Instead, put Z3 binary packages to soarlab.org/files and
-# download them from there in JDoop's env/install-dep.sh script.
-sudo lxc-copy --name $BASE --newname $NEW --mount bind=${Z3_DIR}:${LXC_Z3}:ro
+sudo lxc-copy --name $BASE --newname $NEW
 sudo lxc-start --name $NEW
 
 PKGS="sudo \
@@ -55,6 +49,10 @@ in_container apt-get install --yes $PKGS
 in_container su -c "echo '%sudo ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers"
 in_container useradd --create-home --groups sudo --shell /bin/bash $LXC_USER
 
+Z3_DIR=/z3
+in_container mkdir $Z3_DIR
+in_container chown $LXC_USER:$LXC_USER $Z3_DIR
+
 JDOOP_REPO=https://github.com/psycopaths/jdoop
 JDOOP_BRANCH=custom-built-z3
 LXC_HOME=/home/$LXC_USER
@@ -62,4 +60,5 @@ JDOOP_DIR=$LXC_HOME/jdoop
 JDOOP_PROJECT=$LXC_HOME/jdoop-project
 in_container su --login -c "git clone $JDOOP_REPO" $LXC_USER
 in_container su --login -c "cd $JDOOP_DIR && git checkout $JDOOP_BRANCH" $LXC_USER
-in_container su --login -c "PROJECT_ROOT=${JDOOP_PROJECT} INSTALL_PACKAGES=0 Z3_DIR=${LXC_Z3} sudo $JDOOP_DIR/env/install-dep.sh" $LXC_USER
+in_container su --login -c "PROJECT_ROOT=${JDOOP_PROJECT} INSTALL_PACKAGES=0 Z3_DIR=${Z3_DIR} Z3_FROM_WEB=1 $JDOOP_DIR/env/install-dep.sh" $LXC_USER
+in_container rm -rf $Z3_DIR
