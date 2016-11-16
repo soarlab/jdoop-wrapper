@@ -15,7 +15,7 @@ object InstallNFSClient {
   }
 
   def main(args: Array[String]): Unit = {
-    if (args.length != 2) {
+    if (args.length != 3) {
       println("Usage: <script-name> <nfs-server> <server-dir> <mount-dir>")
       println("  <nfs-server> is the NFS server name")
       println("  <server-dir> is the directory on the NFS server")
