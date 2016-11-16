@@ -16,17 +16,16 @@ object InstallNFSServer {
 
   def main(args: Array[String]): Unit = {
     if (args.length != 2) {
-      println("Usage: <script-name> <N> <share-dir>")
-      println("  <N> is the number of NFS clients")
+      println("Usage: <script-name> <fqdn> <share-dir>")
+      println("  <fqdn> is the domain to share the NFS with")
       println("  <share-dir> is the directory to share over NFS")
       sys.exit(1)
     }
 
-    val count = args(0).toInt
+    val fqdn = args(0)
     val shareDir = args(1)
 
-    val clients = (1 to count).map{i => "node-" + (i + 1)}.mkString(",")
-    val exports = s"$shareDir $clients(rw,sync,no_root_squash)"
+    val exports = s"$shareDir *.$fqdn(rw,sync,no_root_squash)"
 
     for {
       _ <-  s"sudo mkdir -p $shareDir".!
