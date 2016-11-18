@@ -11,6 +11,8 @@ in_container() {
 [ -z "$1" ] && echo "A base container name missing" && exit 1
 [ -z "$2" ] && echo "A destination container name missing" && exit 1
 
+sudo /etc/init.d/apparmor restart
+
 BASE=$1
 sudo lxc-info --name $BASE --state > /dev/null
 
