@@ -91,6 +91,7 @@ object JDoopContainer {
           s"$jdoop_dir/env/install-dep.sh",
         lxc_user))
       _ <- in_container(s"rm -rf $z3_dir")
+      _ <-  s"sudo lxc-stop --name $destination".!
     } yield ()
   }
 }
