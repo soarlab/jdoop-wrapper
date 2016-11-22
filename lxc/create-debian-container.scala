@@ -1,4 +1,7 @@
-#!/usr/bin/env scala
+#!/bin/sh
+export SCRIPT_PATH=$(readlink -f "$0")
+exec scala "$0" "$@"
+!#
 
 // Usage: <script-name> <template> <release> <timestamp>
 //   <template> is an LXC template
@@ -8,9 +11,11 @@
 import sys.process._
 
 object DebianContainer {
+  val scriptPath = System.getenv("SCRIPT_PATH")
+  val scriptDir  = scriptPath.substring(0, scriptPath.lastIndexOf("/"))
   // An assumed LXC template
   // val defaultTemplate = "/mnt/storage/jdoop-wrapper/lxc/templates/lxc-debian"
-  val defaultTemplate = ("pwd" !!).trim + "/templates/lxc-debian"
+  val defaultTemplate = scriptDir + "/templates/lxc-debian"
   // A Debian release
   val defaultDebianRelease = "stretch"
   // A valid time stamp for the Debian Snapshot Archive
