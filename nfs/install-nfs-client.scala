@@ -17,7 +17,7 @@ object InstallNFSClient {
   def main(args: Array[String]): Unit = {
     if (args.length != 3) {
       println("Usage: <script-name> <nfs-server> <server-dir> <mount-dir>")
-      println("  <nfs-server> is the NFS server name")
+      println("  <nfs-server> is the NFS server identifier")
       println("  <server-dir> is the directory on the NFS server")
       println("  <mount-dir> is the directory to mount to the NFS")
       sys.exit(1)
@@ -32,6 +32,10 @@ object InstallNFSClient {
       _ <- s"sudo chown marko: $mountDir".!
       _ <-  "sudo apt-get install --yes nfs-common".!
       _ <- s"sudo mount $nfsServer:$serverDir $mountDir".!
+      // create and delete a file on the NFS just to make it work
+      // properly.
+      tmpFile = (s"mktemp --tmpdir=$mountDir" !!).trim
+      _ <- s"rm -f $tmpFile".!
     } yield ()
   }
 }
