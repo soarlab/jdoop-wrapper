@@ -59,6 +59,7 @@ object JDoopContainer {
 
     val base = args(0)
     implicit val destination = args(1)
+    val benchmarkDir = "/benchmark"
 
     for {
       _ <-   "sudo /etc/init.d/apparmor restart".!
@@ -91,6 +92,8 @@ object JDoopContainer {
           s"$jdoop_dir/env/install-dep.sh",
         lxc_user))
       _ <- in_container(s"rm -rf $z3_dir")
+      _ <- in_container(s"mkdir $benchmarkDir")
+      _ <- in_container(s"chown $lxc_user: $benchmarkDir")
       _ <-  s"sudo lxc-stop --name $destination".!
     } yield ()
   }
