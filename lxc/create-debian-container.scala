@@ -35,6 +35,7 @@ object DebianContainer {
       "--mirror=" +
         s"http://snapshot.debian.org/archive/debian/$timestamp/",
       "--security-mirror=" +
-        s"http://snapshot.debian.org/archive/debian-security/$timestamp/")) !
+        s"http://snapshot.debian.org/archive/debian-security/$timestamp/",
+      "--package=" + "fakeroot")) !
   }
 }
