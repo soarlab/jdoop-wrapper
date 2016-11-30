@@ -14,6 +14,7 @@ $WRAPPER_HOME/lxc/create-debian-container.scala
 $WRAPPER_HOME/lxc/create-jdoop-container.scala stretch jdoop
 $WRAPPER_HOME/nfs/install-nfs-client.scala ${NFS_SERVER} ${SERVER_DIR} ${MOUNT_DIR}
 $WRAPPER_HOME/spark/install-spark.sh
+${WRAPPER_HOME}/spark/install-sbt.scala
 $WRAPPER_HOME/cpu/disable-hyperthreading.sh || true
 
 . ${WRAPPER_HOME}/spark/my-env.sh
