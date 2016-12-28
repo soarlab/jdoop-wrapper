@@ -14,7 +14,5 @@ SPARK_HOME=${SPARK_HOME:-$SPARK_HADOOP_DIR}
 # Set a Scala version used by Spark
 SPARK_SCALA_VERSION=${SPARK_SCALA_VERSION:-"2.11"}
 
-NFS_SERVER=10.1.1.2
-NFS_NETWORK=10.1.1.0/24
 SERVER_DIR=/mnt/storage/to-share-over-nfs
 MOUNT_DIR=/mnt/storage/to-share-over-nfs
