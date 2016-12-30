@@ -14,7 +14,6 @@ object DebianContainer {
   val scriptPath = System.getenv("SCRIPT_PATH")
   val scriptDir  = scriptPath.substring(0, scriptPath.lastIndexOf("/"))
   // An assumed LXC template
-  // val defaultTemplate = "/mnt/storage/jdoop-wrapper/lxc/templates/lxc-debian"
   val defaultTemplate = scriptDir + "/templates/lxc-debian"
   // A Debian release
   val defaultDebianRelease = "stretch"

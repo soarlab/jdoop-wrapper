@@ -93,7 +93,6 @@ object JDoopContainer {
         lxc_user))
       _ <- in_container(s"rm -rf $z3_dir")
       _ <- in_container(s"mkdir $benchmarkDir")
-      _ <- in_container(s"chown $lxc_user: $benchmarkDir")
       _ <-  s"sudo lxc-stop --name $destination".!
     } yield ()
   }
