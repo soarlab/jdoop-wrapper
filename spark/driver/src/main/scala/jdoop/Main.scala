@@ -181,7 +181,8 @@ object Main {
         b, timelimit,
         Seq(sfRoot, b).mkString("/"),
         Seq(nfsShare, b).mkString("/"))
-      } // drop(1) take(1)
+      },
+      benchmarkList.length // the number of partitions of the data
     )
 
     val r = distBenchmarks.map{runSF100JDoopTask}.reduce{(_, _) => ()}
