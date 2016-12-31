@@ -27,3 +27,5 @@ case class SourcePackage(
     printer.format(xml)
   }
 }
+
+case class SF110Project(projectDir: String)
