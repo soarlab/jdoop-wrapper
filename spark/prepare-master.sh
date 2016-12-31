@@ -21,3 +21,9 @@ done
 NFS_NETWORK="${NFS_NETWORK}0/24"
 
 ${WRAPPER_HOME}/nfs/install-nfs-server.scala ${NFS_NETWORK} ${SERVER_DIR}
+
+# The master node for now will be a worker node too
+PKGS="lxc scala"
+sudo apt-get update && sudo apt-get install --yes $PKGS
+$WRAPPER_HOME/lxc/create-debian-container.scala
+$WRAPPER_HOME/lxc/create-jdoop-container.scala stretch jdoop
