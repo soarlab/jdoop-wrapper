@@ -47,7 +47,6 @@ object Main {
 
     val baseContainerName = "jdoop"
     val benchmarkDir = "/benchmark"
-    val tmpWorkDir = Files.createTempDirectory("work-").toString
     val workDir = "/work"
     val lxcUser = "debian"
     val jdoopDir = s"/home/$lxcUser/jdoop"
@@ -56,10 +55,12 @@ object Main {
     val relativeSrcDir = "src/src/main/java"
     val relativeBinDir = "bin"
     val dependencyLibs = recursiveListFiles(
-      new File(task.masterNodeBenchmarkDir + s"/$relativeBinDir/lib"),
+      new File(task.hostBenchmarkDir + s"/$relativeBinDir/lib"),
       """.*\.jar""".r)
       .mkString(":")
-      .replaceAll(task.masterNodeBenchmarkDir, benchmarkDir)
+      .replaceAll(task.hostBenchmarkDir, benchmarkDir)
+
+    s"mkdir -p ${task.hostWorkDir}".!
 
     implicit val containerName: String = task.containerName
 
@@ -91,12 +92,12 @@ object Main {
       lxcUser
     )
 
-    var r: Int = s"sudo chown 1000:1000 $tmpWorkDir".!
-      if (r != 0) println(s"${task.containerName}: sudo chown 1000:1000 $tmpWorkDir didn't return 0")
+    var r: Int = s"sudo chown 1000:1000 ${task.hostWorkDir}".!
+      if (r != 0) println(s"${task.containerName}: sudo chown 1000:1000 ${task.hostWorkDir} didn't return 0")
     r = (s"sudo lxc-copy --ephemeral --name $baseContainerName " +
       s"--newname ${task.containerName} " +
-      s"--mount bind=${task.masterNodeBenchmarkDir}:$benchmarkDir:ro," +
-      s"bind=$tmpWorkDir:$workDir").!
+      s"--mount bind=${task.hostBenchmarkDir}:$benchmarkDir:ro," +
+      s"bind=${task.hostWorkDir}:$workDir").!
     if (r != 0) println(s"${task.containerName}: container creation didn't return 0")
     r = "sleep 5s".!
     if (r != 0) println(s"${task.containerName}: sleep 5 didn't return 0")
@@ -106,12 +107,12 @@ object Main {
     if (r != 0) println(s"${task.containerName}: running JDoop in the container didn't return 0")
 
     // for {
-    //   _ <- s"sudo chown 1000:1000 $tmpWorkDir".!
+    //   _ <- s"sudo chown 1000:1000 ${task.hostWorkDir}".!
     //   // create an ephemeral container for jdoop with an overlay fs
     //   _ <- (s"sudo lxc-copy --ephemeral --name $baseContainerName " +
     //     s"--newname ${task.containerName} " +
-    //     s"--mount bind=${task.masterNodeBenchmarkDir}:$benchmarkDir:ro," +
-    //     s"bind=$tmpWorkDir:$workDir").!
+    //     s"--mount bind=${task.hostBenchmarkDir}:$benchmarkDir:ro," +
+    //     s"bind=${task.hostWorkDir}:$workDir").!
     //   // sleep for a few seconds to make sure a network device is
     //   // ready
     //   _ <- "sleep 5s".!
@@ -128,9 +129,9 @@ object Main {
     // to make sure the container is destroyed.
     s"sudo lxc-stop --name ${task.containerName}".!
 
-    s"sudo chown -R ${System.getenv("USER")}: $tmpWorkDir".!
-    s"rsync -a $tmpWorkDir/ ${task.masterNodeWorkDir}/".!
-    // s"rm -rf $tmpWorkDir".!
+    s"sudo chown -R ${System.getenv("USER")}: ${task.hostWorkDir}".!
+    // s"rsync -a $hostWorkDir/ ${task.hostWorkDir}/".!
+    // s"rm -rf $hostWorkDir".!
 
     // "sleep 1s".!
     // "hostname".!! + task.project.projectDir
@@ -160,17 +161,7 @@ object Main {
     val sfRoot = "/mnt/storage/sf110"
     val nfsShare = "/mnt/storage/to-share-over-nfs/test"
 
-    // create all benchmark directories in advance on the master node
-    // because worker nodes don't have permission to change ownership
-    // of directories in an NFS file system, yet I need to set up the
-    // ownership for the container to work.
-    benchmarkList foreach { b =>
-      val workDir = Seq(nfsShare, b).mkString("/")
-      s"mkdir -p $workDir".!
-      // set the owner to this user and group, otherwise the
-      // container won't be able to write to this directory
-      s"sudo chmod o+rwx $workDir".!
-    }
+    val sfResultsRoot = "/mnt/storage/sf110-results"
 
     val conf = new SparkConf().setAppName("JDoop Executor")
     val sc = new SparkContext(conf)
@@ -180,7 +171,7 @@ object Main {
         SF110Project(b),
         b, timelimit,
         Seq(sfRoot, b).mkString("/"),
-        Seq(nfsShare, b).mkString("/"))
+        Seq(sfResultsRoot, b).mkString("/"))
       },
       benchmarkList.length // the number of partitions of the data
     )
