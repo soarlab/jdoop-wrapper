@@ -92,37 +92,22 @@ object Main {
       lxcUser
     )
 
-    var r: Int = s"sudo chown 1000:1000 ${task.hostWorkDir}".!
-      if (r != 0) println(s"${task.containerName}: sudo chown 1000:1000 ${task.hostWorkDir} didn't return 0")
-    r = (s"sudo lxc-copy --ephemeral --name $baseContainerName " +
-      s"--newname ${task.containerName} " +
-      s"--mount bind=${task.hostBenchmarkDir}:$benchmarkDir:ro," +
-      s"bind=${task.hostWorkDir}:$workDir").!
-    if (r != 0) println(s"${task.containerName}: container creation didn't return 0")
-    r = "sleep 5s".!
-    if (r != 0) println(s"${task.containerName}: sleep 5 didn't return 0")
-    r = s"sudo lxc-info --name ${task.containerName} --state".!
-    if (r != 0) println(s"${task.containerName}: lxc-info didn't return 0")
-    r = in_containerSeq(jdoopCmd)
-    if (r != 0) println(s"${task.containerName}: running JDoop in the container didn't return 0")
-
-    // for {
-    //   _ <- s"sudo chown 1000:1000 ${task.hostWorkDir}".!
-    //   // create an ephemeral container for jdoop with an overlay fs
-    //   _ <- (s"sudo lxc-copy --ephemeral --name $baseContainerName " +
-    //     s"--newname ${task.containerName} " +
-    //     s"--mount bind=${task.hostBenchmarkDir}:$benchmarkDir:ro," +
-    //     s"bind=${task.hostWorkDir}:$workDir").!
-    //   // sleep for a few seconds to make sure a network device is
-    //   // ready
-    //   _ <- "sleep 5s".!
-    //   // TODO: Constrain container resources. This info should also be
-    //   // part of Task. It's not going to work with LXD as it doesn't
-    //   // see the regular LXC image pool.
-    //   _ <- s"sudo lxc-info --name ${task.containerName} --state".!
-    //   // _ <- in_container(s"chown $lxcUser:$lxcUser $workDir")
-    //   _ <- in_containerSeq(jdoopCmd)
-    // } yield ()
+    for {
+      _ <- s"sudo chown 1000:1000 ${task.hostWorkDir}".!
+      // create an ephemeral container for jdoop with an overlay fs
+      _ <- (s"sudo lxc-copy --ephemeral --name $baseContainerName " +
+        s"--newname ${task.containerName} " +
+        s"--mount bind=${task.hostBenchmarkDir}:$benchmarkDir:ro," +
+        s"bind=${task.hostWorkDir}:$workDir").!
+      // sleep for a few seconds to make sure a network device is
+      // ready
+      _ <- "sleep 5s".!
+      // TODO: Constrain container resources. This info should also be
+      // part of Task. It's not going to work with LXD as it doesn't
+      // see the regular LXC image pool.
+      _ <- s"sudo lxc-info --name ${task.containerName} --state".!
+      _ <- in_containerSeq(jdoopCmd)
+    } yield ()
 
     // Stop the container (this will also destroy it because it is
     // ephemeral). We are running this outside the for comprehension
@@ -130,11 +115,6 @@ object Main {
     s"sudo lxc-stop --name ${task.containerName}".!
 
     s"sudo chown -R ${System.getenv("USER")}: ${task.hostWorkDir}".!
-    // s"rsync -a $hostWorkDir/ ${task.hostWorkDir}/".!
-    // s"rm -rf $hostWorkDir".!
-
-    // "sleep 1s".!
-    // "hostname".!! + task.project.projectDir
   }
 
   def usage(): Unit = {
@@ -178,7 +158,6 @@ object Main {
     else 30 // the default time limit of 30 seconds
 
     val sfRoot = "/mnt/storage/sf110"
-    val nfsShare = "/mnt/storage/to-share-over-nfs/test"
 
     val sfResultsRoot = "/mnt/storage/sf110-results"
     // adjust the range below if the number/setup of worker nodes
