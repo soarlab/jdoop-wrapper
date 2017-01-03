@@ -4,7 +4,7 @@ import org.apache.spark.{SparkConf, SparkContext}
 
 object Main {
 
-  def runSF100JDoopTask(task: SF110Task): Unit = {
+  def runSF100JDoopTask(task: Task): Unit = {
     import java.io.File
     import java.nio.file.{Files, Path}
     import scala.util.matching.Regex
@@ -173,7 +173,7 @@ object Main {
     val sc = new SparkContext(conf)
 
     val distBenchmarks = sc.parallelize(
-      benchmarkList map { b => SF110Task(
+      benchmarkList map { b => Task(
         SF110Project(b),
         b, timelimit,
         Seq(sfRoot, b).mkString("/"),

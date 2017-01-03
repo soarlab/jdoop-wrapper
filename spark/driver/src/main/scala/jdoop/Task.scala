@@ -1,12 +1,8 @@
 package jdoop
 
-case class Task(
-  pkg: SourcePackage,
-  containerName: String,
-  baseDir: String,
-  timelimit: Int)
+case class SF110Project(projectDir: String)
 
-case class SF110Task(
+case class Task(
   project: SF110Project,
   containerName: String,
   timelimit: Int,
