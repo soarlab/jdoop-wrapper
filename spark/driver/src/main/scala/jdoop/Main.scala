@@ -143,6 +143,25 @@ object Main {
     sys.exit(1)
   }
 
+  def initResDirs(remoteLoc: Map[String, String]): Unit = {
+    import sys.process._
+
+    remoteLoc foreach { case (machine, dir) =>
+      s"ssh $machine rm -rf $dir".!
+      s"ssh $machine mkdir -p $dir".!
+    }
+  }
+
+  def pullResults(remoteLoc: Map[String, String],
+    localDir: String): Unit = {
+    import sys.process._
+
+    remoteLoc foreach { case (machine, dir) =>
+      println(s"Pulling results from $machine...")
+      s"rsync -a $machine:$dir/ $localDir/".!
+    }
+  }
+
   def main(args: Array[String]): Unit = {
     import sys.process._
 
@@ -162,6 +181,14 @@ object Main {
     val nfsShare = "/mnt/storage/to-share-over-nfs/test"
 
     val sfResultsRoot = "/mnt/storage/sf110-results"
+    // adjust the range below if the number/setup of worker nodes
+    // changes
+    val loc = (2 to 4).toSeq.map{ i =>
+      s"node-$i.multinode.jpf-doop.emulab.net"
+    }.foldLeft(Map[String, String]()){ (m, w) =>
+      m + (w -> sfResultsRoot)
+    }
+    initResDirs(loc)
 
     val conf = new SparkConf().setAppName("JDoop Executor")
     val sc = new SparkContext(conf)
@@ -177,15 +204,10 @@ object Main {
     )
 
     val r = distBenchmarks.map{runSF100JDoopTask}.reduce{(_, _) => ()}
+    println(r) // I'm not sure if this is needed, but in case it is,
+               // it will enforce 'r' to be evaluated.
+    sc.stop()
 
-    println(r)
-
-    // val list: String = distBenchmarks.map{runSF100JDoopTask}.reduce(_ + "\n" + _)
-    // val list: String = distBenchmarks.map{runSF100JDoopTask}.reduce((
-    //   a: String, b: String) => a + b.toList.mkString("").replaceAll("\n", ""))
-    // println(list)
-    // list foreach { a => println(a) }
-
-    // sc.stop()
+    pullResults(loc, sfResultsRoot)
   }
 }
