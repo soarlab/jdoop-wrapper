@@ -28,7 +28,7 @@ object Stats {
     }
     def ratio: Double = covered / total.toDouble
     override def toString: String = {
-      def div(x: Int): Int = x / count
+      def div(x: Int): Double = x.toDouble / count
       div(covered) + " / " + div(total)
     }
   }
