@@ -120,17 +120,21 @@ object Stats {
       Some(CovMetric(covered, covered + missed))
     }
 
-  def covFromFile(covTypes: Seq[CovType])(f: File): Option[Seq[CovMetric]] =
+  def covFromFile(covTypes: Seq[CovType])(f: File):
+      Option[Map[CovType, CovMetric]] =
     for {
       e <- jacocoReport(f)
-    } yield for {
-      t <- covTypes
-      n <- findCovMetric(e)(t)
-      m <- counterToCovMetric(n)
-    } yield m
+    } yield (
+      for {
+        t <- covTypes
+        n <- findCovMetric(e)(t)
+        m <- counterToCovMetric(n)
+      } yield t -> m
+    ).toMap
   
-  def covForFiles(cov: Map[File, Seq[CovType]]): Map[File, Option[Seq[CovMetric]]] =
-    cov.keySet.foldRight(Map[File, Option[Seq[CovMetric]]]()){ (f, acc) =>
+  def covForFiles(cov: Map[File, Seq[CovType]]):
+      Map[File, Option[Map[CovType, CovMetric]]] =
+    cov.keySet.foldRight(Map[File, Option[Map[CovType, CovMetric]]]()){ (f, acc) =>
       acc + (f -> covFromFile(cov(f))(f))
     }
 
@@ -139,6 +143,42 @@ object Stats {
     println("Every directory name is a natural number")
     sys.exit(1)
   }
+
+  def extfromPathEnd(f: File, n: Integer): String =
+    f.getPath.split("/").reverse(n)
+
+  def extProjDir(f: File): String = extfromPathEnd(f, 2)
+  def extTimelimit(f: File): Time = extfromPathEnd(f, 3).toInt
+
+  def reportMap: Seq[String] => Map[File, Seq[CovType]] = dirs =>
+    (for {
+      dir <- dirs
+      bm  <- benchmarksInDir(new File(dir))
+    } yield ((
+      new File(
+        Seq(dir, bm.projectDir, "jacoco-site", "report.xml")
+          .mkString("/")
+      ),
+      bothCovTypes
+    ))
+    ).toMap
+
+  def statsList:
+      Map[File, Option[Map[CovType, CovMetric]]] => List[BenchmarkStats] =
+    _.foldRight(List[BenchmarkStats]()){(kv, acc) =>
+      val (f, oCovMap) = kv
+      oCovMap match {
+        case None => acc
+        case Some(covMap) =>
+          val bmstats = BenchmarkStats(
+            proj = SF110Project(extProjDir(f)),
+            branchCov = covMap.getOrElse(BranchCov, CovMetric(0, 0)),
+            instructionCov = covMap.getOrElse(InstructionCov, CovMetric(0, 0)),
+            timelimit = extTimelimit(f)
+          )
+          bmstats :: acc
+      }
+    }
 
   def main(args: Array[String]): Unit = {
     if (args.length == 0) usage()
@@ -149,20 +189,12 @@ object Stats {
     }
     catch { case _: Throwable => usage() }
 
-    val reportMap: Map[File, Seq[CovType]] =
-      (for {
-        dir <- dirs
-        bm  <- benchmarksInDir(new File(dir))
-      } yield ((
-        new File(
-          Seq(dir, bm.projectDir, "jacoco-site", "report.xml")
-            .mkString("/")
-        ),
-        bothCovTypes
-      ))
-      ).toMap
-
-    val res = covForFiles(reportMap)
-    res foreach { case (r, Some(stats)) => println(s"$r: $stats") }
+    val stats =
+      (reportMap andThen covForFiles andThen statsList andThen processStats)(dirs)
+    stats foreach { case (t, set) =>
+      println(s"Timelimit: $t")
+      println("Results:")
+      set foreach println
+    }
   }
 }
