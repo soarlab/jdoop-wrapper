@@ -1,6 +1,10 @@
 package jdoop
 
+import java.io._
+import java.util.concurrent.locks.ReentrantReadWriteLock
+import java.util.concurrent.locks.ReentrantReadWriteLock.WriteLock
 import org.apache.spark.{SparkConf, SparkContext}
+import sys.process._
 
 object Main {
 
@@ -104,7 +108,17 @@ object Main {
       _ <- "sleep 5s".!
       // TODO: Constrain container resources. This info should also be
       // part of Task. It's not going to work with LXD as it doesn't
-      // see the regular LXC image pool.
+      // see the regular LXC image pool. Limit CPU and memory. The
+      // cpu.shares thing with cgroups is probably not going to work
+      // by its own. Probably I'll have to have a file listing all
+      // available CPU cores and then take e.g. 4 cores off of that
+      // list and allocate them to the container. This will have to be
+      // done in a thread-safe manner.
+      _ <- (s"sudo lxc-cgroup --name ${task.containerName} " +
+        s"memory.limit_in_bytes ${task.memoryLimit}").!
+      // disable the swap memory in the container
+      // _ <- (s"sudo lxc-cgroup --name ${task.containerName} " +
+      //   s"memory.memsw.limit_in_bytes 0").!
       _ <- s"sudo lxc-info --name ${task.containerName} --state".!
       _ <- in_containerSeq(jdoopCmd)
     } yield ()
@@ -124,8 +138,6 @@ object Main {
   }
 
   def initResDirs(remoteLoc: Map[String, String]): Unit = {
-    import sys.process._
-
     remoteLoc foreach { case (machine, dir) =>
       s"ssh $machine rm -rf $dir".!
       s"ssh $machine mkdir -p $dir".!
@@ -134,17 +146,27 @@ object Main {
 
   def pullResults(remoteLoc: Map[String, String],
     localDir: String): Unit = {
-    import sys.process._
-
     remoteLoc foreach { case (machine, dir) =>
       println(s"Pulling results from $machine...")
       s"rsync -a $machine:$dir/ $localDir/".!
     }
   }
 
-  def main(args: Array[String]): Unit = {
-    import sys.process._
+  def printToFile(f: File)(op: PrintWriter => Unit): Unit = {
+    val p = new PrintWriter(f)
+    try { op(p) } finally { p.close() }
+  }
 
+  def pushCgroupsFile(
+    machines: Set[String],
+    path: String,
+    coreCount: Int): Unit = {
+
+    printToFile(new File(path)){p => (0 until coreCount) foreach { p.println }}
+    machines foreach { m => s"rsync -a $path $m:$path".! }
+  }
+
+  def main(args: Array[String]): Unit = {
     if (args.length < 1 || args.length > 2)
       usage()
 
@@ -159,7 +181,7 @@ object Main {
 
     val sfRoot = "/mnt/storage/sf110"
 
-    val sfResultsRoot = "/mnt/storage/sf110-results"
+    val sfResultsRoot = "/mnt/storage/sf110-results/test3"
     // adjust the range below if the number/setup of worker nodes
     // changes
     val loc = (2 to 4).toSeq.map{ i =>
@@ -167,17 +189,27 @@ object Main {
     }.foldLeft(Map[String, String]()){ (m, w) =>
       m + (w -> sfResultsRoot)
     }
+    // The d430 nodes in Emulab come with 16 CPU cores and 64 GB of
+    // memory. I'm assigning 4 CPU cores (which corresponds to 25%, or
+    // equivalently cpu.shares = 250 in terms of
+    // cgroups). Furthermore, I'm assigning 8 GB of memory per task.
+    val cpuShare = 250
+    val memoryLimit = 8.toLong * 1024 * 1024 * 1024 // 8 GB
     initResDirs(loc)
+    pushCgroupsFile(loc.keySet, "/tmp/cpu-cores", 16)
 
     val conf = new SparkConf().setAppName("JDoop Executor")
     val sc = new SparkContext(conf)
 
     val distBenchmarks = sc.parallelize(
       benchmarkList map { b => Task(
-        SF110Project(b),
-        b, timelimit,
-        Seq(sfRoot, b).mkString("/"),
-        Seq(sfResultsRoot, b).mkString("/"))
+        project = SF110Project(b),
+        containerName = b,
+        timelimit = timelimit,
+        hostBenchmarkDir = Seq(sfRoot, b).mkString("/"),
+        hostWorkDir = Seq(sfResultsRoot, b).mkString("/"),
+        cpuShare = cpuShare,
+        memoryLimit = memoryLimit)
       },
       benchmarkList.length // the number of partitions of the data
     )
