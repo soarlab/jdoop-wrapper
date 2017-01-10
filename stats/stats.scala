@@ -26,10 +26,9 @@ object Stats {
 
       CovMetric(covered + that.covered, total + that.total, count + that.count)
     }
-    def ratio: Double = covered / total.toDouble
+    def ratio: Double = if (total == 0) 0.0 else covered / total.toDouble
+    def percentage: Double = 100.0 * ratio
     override def toString: String = {
-      def percentage: Double =
-        if (total == 0) 0.0 else 100.0 * covered / total
       def div(x: Int): Double = x.toDouble / count
       div(covered) + " / " + div(total) + " (" + "%2.1f".format(percentage) + "%)"
     }
