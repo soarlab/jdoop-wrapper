@@ -28,8 +28,10 @@ object Stats {
     }
     def ratio: Double = covered / total.toDouble
     override def toString: String = {
+      def percentage: Double =
+        if (total == 0) 0.0 else 100.0 * covered / total
       def div(x: Int): Double = x.toDouble / count
-      div(covered) + " / " + div(total)
+      div(covered) + " / " + div(total) + " (" + "%2.1f".format(percentage) + "%)"
     }
   }
 
