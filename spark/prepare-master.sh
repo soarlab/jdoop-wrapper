@@ -2,6 +2,11 @@
 
 # Prepares the master node for computation
 
+set -e
+
+# Disable the swap memory
+sudo swapoff -a
+
 WRAPPER_HOME="$(cd "`dirname "$0"`"/..; pwd)"
 ${WRAPPER_HOME}/spark/install-spark.sh
 ${WRAPPER_HOME}/spark/install-sbt.scala

@@ -4,6 +4,9 @@
 
 set -e
 
+# Disable the swap memory
+sudo swapoff -a
+
 PKGS="lxc scala"
 sudo apt-get update && sudo apt-get install --yes $PKGS
 
