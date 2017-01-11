@@ -181,6 +181,9 @@ object Stats {
       }
     }
 
+  def run: Seq[String] => Map[Time, Set[BenchmarkStats]] =
+    reportMap andThen covForFiles andThen statsList andThen processStats
+
   def main(args: Array[String]): Unit = {
     if (args.length == 0) usage()
     val dirs = args.toSeq
@@ -190,8 +193,7 @@ object Stats {
     }
     catch { case _: Throwable => usage() }
 
-    val stats =
-      (reportMap andThen covForFiles andThen statsList andThen processStats)(dirs)
+    val stats = run(dirs)
     stats foreach { case (t, set) =>
       println(s"Timelimit: $t")
       println("Results:")
