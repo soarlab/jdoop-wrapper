@@ -181,13 +181,11 @@ object Main {
 
     val sfRoot = "/mnt/storage/sf110"
 
-    val sfResultsRoot = "/mnt/storage/sf110-results/test3"
+    val sfResultsRoot = "/mnt/storage/sf110-results/test4/30"
     // adjust the range below if the number/setup of worker nodes
     // changes
-    val loc = (2 to 4).toSeq.map{ i =>
-      s"node-$i.multinode.jpf-doop.emulab.net"
-    }.foldLeft(Map[String, String]()){ (m, w) =>
-      m + (w -> sfResultsRoot)
+    val loc = (2 to 4).foldLeft(Map[String, String]()){ (m, i) =>
+      m + (s"node-$i.multinode.jpf-doop.emulab.net" -> sfResultsRoot)
     }
     // The d430 nodes in Emulab come with 16 CPU cores and 64 GB of
     // memory. I'm assigning 4 CPU cores (which corresponds to 25%, or
