@@ -24,14 +24,14 @@ object Stats {
     def +(that: CovMetric): CovMetric = {
       require(total == that.total)
 
-      CovMetric(covered + that.covered, total + that.total, count + that.count)
+      CovMetric(covered + that.covered, total, count + that.count)
     }
-    def ratio: Double = if (total == 0) 0.0 else covered / total.toDouble
-    def percentage: Double = 100.0 * ratio
-    override def toString: String = {
-      def div(x: Int): Double = x.toDouble / count
-      div(covered) + " / " + div(total) + " (" + "%2.1f".format(percentage) + "%)"
-    }
+    lazy val coveredNorm: Double = covered.toDouble / count
+    lazy val ratio: Double = if (total == 0) 0.0 else coveredNorm / total
+    lazy val percentage: Double = 100.0 * ratio
+    override def toString: String =
+      "%.1f".format(coveredNorm) + " / " + total +
+        " (" + "%2.1f".format(percentage) + "%)"
   }
 
   type Time = Int
