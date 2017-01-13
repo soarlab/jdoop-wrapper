@@ -1,5 +1,7 @@
 package jdoop
 
+import Constants._
+import CPUCoresUtil._
 import java.io._
 import java.util.concurrent.locks.ReentrantReadWriteLock
 import java.util.concurrent.locks.ReentrantReadWriteLock.WriteLock
@@ -96,6 +98,8 @@ object Main {
       lxcUser
     )
 
+    val containerCores = GetContainerCores(coresPerContainer)
+
     for {
       _ <- s"sudo chown 1000:1000 ${task.hostWorkDir}".!
       // create an ephemeral container for jdoop with an overlay fs
@@ -106,16 +110,11 @@ object Main {
       // sleep for a few seconds to make sure a network device is
       // ready
       _ <- "sleep 5s".!
-      // TODO: Constrain container resources. This info should also be
-      // part of Task. It's not going to work with LXD as it doesn't
-      // see the regular LXC image pool. Limit CPU and memory. The
-      // cpu.shares thing with cgroups is probably not going to work
-      // by its own. Probably I'll have to have a file listing all
-      // available CPU cores and then take e.g. 4 cores off of that
-      // list and allocate them to the container. This will have to be
-      // done in a thread-safe manner.
+      // Constraining CPU and memory usage
       _ <- (s"sudo lxc-cgroup --name ${task.containerName} " +
-        s"memory.limit_in_bytes ${task.memoryLimit}").!
+        s"cpuset.cpus " + containerCores.mkString(",")).!
+      _ <- (s"sudo lxc-cgroup --name ${task.containerName} " +
+        s"memory.limit_in_bytes $memoryPerContainer").!
       // disable the swap memory in the container
       // _ <- (s"sudo lxc-cgroup --name ${task.containerName} " +
       //   s"memory.memsw.limit_in_bytes 0").!
@@ -127,6 +126,8 @@ object Main {
     // ephemeral). We are running this outside the for comprehension
     // to make sure the container is destroyed.
     s"sudo lxc-stop --name ${task.containerName}".!
+
+    ReleaseContainerCores(containerCores)
 
     s"sudo chown -R ${System.getenv("USER")}: ${task.hostWorkDir}".!
   }
@@ -152,17 +153,12 @@ object Main {
     }
   }
 
-  def printToFile(f: File)(op: PrintWriter => Unit): Unit = {
-    val p = new PrintWriter(f)
-    try { op(p) } finally { p.close() }
-  }
-
   def pushCgroupsFile(
     machines: Set[String],
     path: String,
     coreCount: Int): Unit = {
 
-    printToFile(new File(path)){p => (0 until coreCount) foreach { p.println }}
+    CPUCoresUtil.generateFile()
     machines foreach { m => s"rsync -a $path $m:$path".! }
   }
 
@@ -173,28 +169,22 @@ object Main {
     val source = scala.io.Source.fromFile(args(0))
     val benchmarkList =
       try source.mkString.split("\n").toSeq finally source.close()
-    val timelimit = if (args.length == 2)
-      try args(1).toInt catch {case _: Throwable => usage(); 0}
-    // 0 is at the end of the catch block in order to make the block's
-    // type be Int so it lines up with the type of the try block.
-    else 30 // the default time limit of 30 seconds
+    val timelimit =
+      if (args.length == 2)
+        try args(1).toInt catch {case _: Throwable => usage(); 0}
+        // 0 is at the end of the catch block in order to make the
+        // block's type be Int so it lines up with the type of the try
+        // block.
+      else defaultTimelimit // the default time limit of 30 seconds
 
     val sfRoot = "/mnt/storage/sf110"
 
-    val sfResultsRoot = "/mnt/storage/sf110-results/test4/30"
-    // adjust the range below if the number/setup of worker nodes
-    // changes
-    val loc = (2 to 4).foldLeft(Map[String, String]()){ (m, i) =>
-      m + (s"node-$i.multinode.jpf-doop.emulab.net" -> sfResultsRoot)
+    val sfResultsRoot = "/mnt/storage/sf110-results/test5/30"
+    val loc = workerMachines.foldLeft(Map[String, String]()){
+      (map, machine) => map + (machine -> sfResultsRoot)
     }
-    // The d430 nodes in Emulab come with 16 CPU cores and 64 GB of
-    // memory. I'm assigning 4 CPU cores (which corresponds to 25%, or
-    // equivalently cpu.shares = 250 in terms of
-    // cgroups). Furthermore, I'm assigning 8 GB of memory per task.
-    val cpuShare = 250
-    val memoryLimit = 8.toLong * 1024 * 1024 * 1024 // 8 GB
     initResDirs(loc)
-    pushCgroupsFile(loc.keySet, "/tmp/cpu-cores", 16)
+    pushCgroupsFile(loc.keySet, cpuCoresFilePath, totalCpuCores)
 
     val conf = new SparkConf().setAppName("JDoop Executor")
     val sc = new SparkContext(conf)
@@ -205,9 +195,7 @@ object Main {
         containerName = b,
         timelimit = timelimit,
         hostBenchmarkDir = Seq(sfRoot, b).mkString("/"),
-        hostWorkDir = Seq(sfResultsRoot, b).mkString("/"),
-        cpuShare = cpuShare,
-        memoryLimit = memoryLimit)
+        hostWorkDir = Seq(sfResultsRoot, b).mkString("/"))
       },
       benchmarkList.length // the number of partitions of the data
     )

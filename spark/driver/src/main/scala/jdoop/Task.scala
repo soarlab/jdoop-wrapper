@@ -7,6 +7,4 @@ case class Task(
   containerName: String,
   timelimit: Int,
   hostBenchmarkDir: String,
-  hostWorkDir: String,
-  cpuShare: Double,
-  memoryLimit: Long)
+  hostWorkDir: String)

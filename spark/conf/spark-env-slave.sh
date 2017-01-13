@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
 
-SPARK_WORKER_CORES=14
+SPARK_WORKER_CORES=4
