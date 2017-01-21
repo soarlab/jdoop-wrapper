@@ -3,14 +3,14 @@ package jdoop
 import Constants._
 import CPUCoresUtil._
 import java.io._
-import java.util.concurrent.locks.ReentrantReadWriteLock
-import java.util.concurrent.locks.ReentrantReadWriteLock.WriteLock
 import org.apache.spark.{SparkConf, SparkContext}
 import sys.process._
 
 object Main {
 
   def runSF100JDoopTask(task: Task): Unit = {
+    import Constants._
+    import CPUCoresUtil._
     import java.io.File
     import java.nio.file.{Files, Path}
     import scala.util.matching.Regex
@@ -138,26 +138,19 @@ object Main {
     sys.exit(1)
   }
 
-  def initResDirs(remoteLoc: Map[String, String]): Unit = {
+  def initResDirs(remoteLoc: Map[String, String]): Unit =
     remoteLoc foreach { case (machine, dir) =>
-      s"ssh $machine rm -rf $dir".!
+      s"ssh $machine sudo rm -rf $dir".!
       s"ssh $machine mkdir -p $dir".!
     }
-  }
 
-  def pullResults(remoteLoc: Map[String, String],
-    localDir: String): Unit = {
+  def pullResults(remoteLoc: Map[String, String], localDir: String): Unit =
     remoteLoc foreach { case (machine, dir) =>
       println(s"Pulling results from $machine...")
       s"rsync -a $machine:$dir/ $localDir/".!
     }
-  }
 
-  def pushCgroupsFile(
-    machines: Set[String],
-    path: String,
-    coreCount: Int): Unit = {
-
+  def pushCgroupsFile(machines: Set[String], path: String): Unit = {
     CPUCoresUtil.generateFile()
     machines foreach { m => s"rsync -a $path $m:$path".! }
   }
@@ -179,12 +172,12 @@ object Main {
 
     val sfRoot = "/mnt/storage/sf110"
 
-    val sfResultsRoot = "/mnt/storage/sf110-results/test5/30"
+    val sfResultsRoot = s"/mnt/storage/sf110-results/test5/$timelimit"
     val loc = workerMachines.foldLeft(Map[String, String]()){
       (map, machine) => map + (machine -> sfResultsRoot)
     }
-    initResDirs(loc)
-    pushCgroupsFile(loc.keySet, cpuCoresFilePath, totalCpuCores)
+    initResDirs(loc + ("localhost" -> sfResultsRoot))
+    pushCgroupsFile(loc.keySet, cpuCoresFilePath)
 
     val conf = new SparkConf().setAppName("JDoop Executor")
     val sc = new SparkContext(conf)
