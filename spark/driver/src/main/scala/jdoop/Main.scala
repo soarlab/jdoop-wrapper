@@ -4,6 +4,7 @@ import Constants._
 import CPUCoresUtil._
 import java.io._
 import org.apache.spark.{SparkConf, SparkContext}
+import org.apache.spark.rdd.RDD
 import sys.process._
 
 object Main {
@@ -132,16 +133,22 @@ object Main {
     s"sudo chown -R ${System.getenv("USER")}: ${task.hostWorkDir}".!
   }
 
-  def usage(): Unit = {
-    println("One argument needed: <list-of-benchmarks.txt>")
-    println("Optional argument: <time limit> in seconds")
-    sys.exit(1)
-  }
-
-  def initResDirs(remoteLoc: Map[String, String]): Unit =
-    remoteLoc foreach { case (machine, dir) =>
-      s"ssh $machine sudo rm -rf $dir".!
+  /**
+    * Creates result directories if they don't exist and makes sure no
+    * prior benchmark results for the same benchmarks are in way.
+    * @param loc A map of machines and result directories
+    * @param benchmarkList A list of benchmarks
+    * @return False if some benchmark result directories already exist, 
+    *         true otherwise.
+    */
+  def initResDirs(loc: Map[String, String],
+    benchmarkList: Seq[String]): Boolean =
+    (loc foldLeft false) { (failed, kv) =>
+      val (machine, dir) = kv
       s"ssh $machine mkdir -p $dir".!
+      failed || (benchmarkList foldLeft false){ (bFailed, benchmarkDir) =>
+        bFailed || ((s"ssh $machine file -E $dir/$benchmarkDir".!) == 0)
+      }
     }
 
   def pullResults(remoteLoc: Map[String, String], localDir: String): Unit =
@@ -153,6 +160,25 @@ object Main {
   def pushCgroupsFile(machines: Set[String], path: String): Unit = {
     CPUCoresUtil.generateFile()
     machines foreach { m => s"rsync -a $path $m:$path".! }
+  }
+
+  def parallelizeBenchmarks(benchmarkList: Seq[String], sc: SparkContext,
+  timelimit: Int, sfRoot: String, sfResultsRoot: String): RDD[Task] =
+    sc.parallelize(
+      benchmarkList map { b => Task(
+        project = SF110Project(b),
+        containerName = b,
+        timelimit = timelimit,
+        hostBenchmarkDir = Seq(sfRoot, b).mkString("/"),
+        hostWorkDir = Seq(sfResultsRoot, b).mkString("/"))
+      },
+      benchmarkList.length // the number of partitions of the data
+    )
+
+  def usage(): Unit = {
+    println("One argument needed: <list-of-benchmarks.txt>")
+    println("Optional argument: <time limit> in seconds")
+    sys.exit(1)
   }
 
   def main(args: Array[String]): Unit = {
@@ -176,21 +202,26 @@ object Main {
     val loc = workerMachines.foldLeft(Map[String, String]()){
       (map, machine) => map + (machine -> sfResultsRoot)
     }
-    initResDirs(loc + ("localhost" -> sfResultsRoot))
+    val failed = initResDirs(
+      loc + ("localhost" -> sfResultsRoot),
+      benchmarkList
+    )
+    if (failed) {
+      println("Remove existing colliding benchmark directories first!")
+      sys.exit(1)
+    }
+
     pushCgroupsFile(loc.keySet, cpuCoresFilePath)
 
     val conf = new SparkConf().setAppName("JDoop Executor")
     val sc = new SparkContext(conf)
 
-    val distBenchmarks = sc.parallelize(
-      benchmarkList map { b => Task(
-        project = SF110Project(b),
-        containerName = b,
-        timelimit = timelimit,
-        hostBenchmarkDir = Seq(sfRoot, b).mkString("/"),
-        hostWorkDir = Seq(sfResultsRoot, b).mkString("/"))
-      },
-      benchmarkList.length // the number of partitions of the data
+    val distBenchmarks = parallelizeBenchmarks(
+      benchmarkList,
+      sc,
+      timelimit,
+      sfRoot,
+      sfResultsRoot
     )
 
     val r = distBenchmarks.map{runSF100JDoopTask}.reduce{(_, _) => ()}
