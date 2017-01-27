@@ -13,7 +13,11 @@ object Patch {
     // for testing. The file is
     // src/main/java/net/sourceforge/jwbf/mediawiki/contentRep/SomeArticle.java
 
-    val dir = Seq(path, "src", "src/main/java/net/sourceforge/jwbf/mediawiki/contentRep").mkString("/")
+    val dir = Seq(
+      path,
+      "src",
+      "src/main/java/net/sourceforge/jwbf/mediawiki/contentRep"
+    ).mkString("/")
     val baseName = "SomeArticle.java"
     Process(
       Seq("mv", baseName, baseName + ".nonexisting"),
