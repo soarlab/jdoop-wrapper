@@ -151,8 +151,8 @@ object Main {
       }
     }
 
-  def pullResults(remoteLoc: Map[String, String], localDir: String): Unit =
-    remoteLoc foreach { case (machine, dir) =>
+  def pullResults(loc: Map[String, String], localDir: String): Unit =
+    loc foreach { case (machine, dir) =>
       println(s"Pulling results from $machine...")
       s"rsync -a $machine:$dir/ $localDir/".!
     }
@@ -163,7 +163,7 @@ object Main {
   }
 
   def parallelizeBenchmarks(benchmarkList: Seq[String], sc: SparkContext,
-  timelimit: Int, sfRoot: String, sfResultsRoot: String): RDD[Task] =
+    timelimit: Int, sfRoot: String, sfResultsRoot: String): RDD[Task] =
     sc.parallelize(
       benchmarkList map { b => Task(
         project = SF110Project(b),
