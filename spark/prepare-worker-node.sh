@@ -16,6 +16,7 @@ WRAPPER_HOME="$(cd "`dirname "$0"`"/..; pwd)"
 # This is a mount point used for benchmarks and results
 sudo chown $USER: /mnt/storage
 
+$WRAPPER_HOME/lxc/change-lxcpath.sh
 $WRAPPER_HOME/lxc/create-debian-container.scala
 $WRAPPER_HOME/lxc/create-jdoop-container.scala stretch jdoop
 $WRAPPER_HOME/spark/install-spark.sh
