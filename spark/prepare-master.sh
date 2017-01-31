@@ -15,6 +15,9 @@ ${WRAPPER_HOME}/spark/install-sbt.scala
 # The master node for now will be a worker node too
 PKGS="lxc scala"
 sudo apt-get update && sudo apt-get install --yes $PKGS
+
+sudo chown $USER: /mnt/scratch
+
 $WRAPPER_HOME/lxc/change-lxcpath.sh
 $WRAPPER_HOME/lxc/create-debian-container.scala
 $WRAPPER_HOME/lxc/create-jdoop-container.scala stretch jdoop

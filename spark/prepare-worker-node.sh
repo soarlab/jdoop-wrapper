@@ -15,6 +15,7 @@ WRAPPER_HOME="$(cd "`dirname "$0"`"/..; pwd)"
 
 # This is a mount point used for benchmarks and results
 sudo chown $USER: /mnt/storage
+sudo chown $USER: /mnt/scratch
 
 $WRAPPER_HOME/lxc/change-lxcpath.sh
 $WRAPPER_HOME/lxc/create-debian-container.scala
