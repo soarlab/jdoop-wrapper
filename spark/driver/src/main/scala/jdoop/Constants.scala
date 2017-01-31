@@ -13,4 +13,7 @@ object Constants {
   val workerMachines = (2 to totalSparkClusterNodes) map {
     i => s"node-$i.multinode.jpf-doop.emulab.net"
   } toSet
+  val scratchResultsRoot = "/mnt/scratch/sf110-results"
+  val finalResultsRoot = "/mnt/storage/sf110-results"
+  val sfRoot = "/mnt/storage/sf110"
 }

@@ -9,6 +9,8 @@ import sys.process._
 
 object Main {
 
+  def mkFilePath(xs: String*): String = new File(xs.mkString("/")).getPath
+
   def runSF100JDoopTask(task: Task): Unit = {
     import Constants._
     import CPUCoresUtil._
@@ -62,11 +64,9 @@ object Main {
     val relativeSrcDir = "src/src/main/java"
     val relativeBinDir = "bin"
     val dependencyLibs = recursiveListFiles(
-      new File(task.hostBenchmarkDir + s"/$relativeBinDir/lib"),
-      """.*\.jar""".r)
-      .mkString(":")
-      .replaceAll(task.hostBenchmarkDir, benchmarkDir)
-
+      new File(mkFilePath(task.hostBenchmarkDir, s"/$relativeBinDir/lib")),
+      """.*\.jar""".r
+    ).mkString(":").replaceAll(task.hostBenchmarkDir, benchmarkDir)
     s"mkdir -p ${task.hostWorkDir}".!
 
     implicit val containerName: String = task.containerName
@@ -79,12 +79,12 @@ object Main {
       "python",
       s"$jdoopDir/jdoop.py",
       "--root",
-      Seq(benchmarkDir, relativeSrcDir).mkString("/"),
+      mkFilePath(benchmarkDir, relativeSrcDir),
       "--timelimit", task.timelimit,
       "--jpf-core-path", s"$jDoopDependencyDir/jpf-core",
       "--jdart-path", s"$jDoopDependencyDir/jdart",
       "--sut-compilation",
-      Seq(benchmarkDir, relativeBinDir).mkString("/"),
+      mkFilePath(benchmarkDir, relativeBinDir),
       "--test-compilation", testsDir,
       "--junit-path", s"$jdoopDir/lib/junit4.jar",
       "--hamcrest-path", s"$jdoopDir/lib/hamcrest-core-1.3.jar",
@@ -151,11 +151,13 @@ object Main {
       }
     }
 
-  def pullResults(loc: Map[String, String], localDir: String): Unit =
+  def pullResults(loc: Map[String, String], localDir: String): Unit = {
+    s"mkdir -p $localDir".!
     loc foreach { case (machine, dir) =>
       println(s"Pulling results from $machine...")
       s"rsync -a $machine:$dir/ $localDir/".!
     }
+  }
 
   def pushCgroupsFile(machines: Set[String], path: String): Unit = {
     CPUCoresUtil.generateFile()
@@ -169,8 +171,8 @@ object Main {
         project = SF110Project(b),
         containerName = b,
         timelimit = timelimit,
-        hostBenchmarkDir = Seq(sfRoot, b).mkString("/"),
-        hostWorkDir = Seq(sfResultsRoot, b).mkString("/"))
+        hostBenchmarkDir = mkFilePath(sfRoot, b),
+        hostWorkDir = mkFilePath(sfResultsRoot, b))
       },
       benchmarkList.length // the number of partitions of the data
     )
@@ -178,11 +180,12 @@ object Main {
   def usage(): Unit = {
     println("One argument needed: <list-of-benchmarks.txt>")
     println("Optional argument: <time limit> in seconds")
+    println("Optional argument: <name> for the experiment name")
     sys.exit(1)
   }
 
   def main(args: Array[String]): Unit = {
-    if (args.length < 1 || args.length > 2)
+    if (args.length < 1 || args.length > 3)
       usage()
 
     val source = scala.io.Source.fromFile(args(0))
@@ -195,15 +198,21 @@ object Main {
         // block's type be Int so it lines up with the type of the try
         // block.
       else defaultTimelimit // the default time limit of 30 seconds
+    val experimentName =
+      if (args.length == 3)
+        args(2)
+      else
+        new java.text.SimpleDateFormat("yyyy-MM-DD-HH-mm-ss").format(
+          new java.util.Date())
+    val resultsSuffixDir = mkFilePath(experimentName, timelimit.toString)
+    val fullScracthResultsDir = mkFilePath(scratchResultsRoot, resultsSuffixDir)
 
-    val sfRoot = "/mnt/storage/sf110"
-
-    val sfResultsRoot = s"/mnt/storage/sf110-results/test5/$timelimit"
     val loc = workerMachines.foldLeft(Map[String, String]()){
-      (map, machine) => map + (machine -> sfResultsRoot)
+      (map, machine) => map +
+      (machine -> fullScracthResultsDir)
     }
     val failed = initResDirs(
-      loc + ("localhost" -> sfResultsRoot),
+      loc + ("localhost" -> fullScracthResultsDir),
       benchmarkList
     )
     if (failed) {
@@ -221,7 +230,7 @@ object Main {
       sc,
       timelimit,
       sfRoot,
-      sfResultsRoot
+      fullScracthResultsDir
     )
 
     val r = distBenchmarks.map{runSF100JDoopTask}.reduce{(_, _) => ()}
@@ -229,6 +238,12 @@ object Main {
                // it will enforce 'r' to be evaluated.
     sc.stop()
 
-    pullResults(loc, sfResultsRoot)
+    pullResults(
+      loc + ("localhost" -> fullScracthResultsDir),
+      mkFilePath(finalResultsRoot, resultsSuffixDir)
+    )
+
+    println("Results are available in: " +
+      mkFilePath(finalResultsRoot, resultsSuffixDir))
   }
 }
