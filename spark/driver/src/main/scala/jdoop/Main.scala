@@ -192,14 +192,14 @@ object Main {
     val benchmarkList =
       try source.mkString.split("\n").toSeq finally source.close()
     val timelimit =
-      if (args.length == 2)
+      if (args.length >= 2)
         try args(1).toInt catch {case _: Throwable => usage(); 0}
         // 0 is at the end of the catch block in order to make the
         // block's type be Int so it lines up with the type of the try
         // block.
       else defaultTimelimit // the default time limit of 30 seconds
     val experimentName =
-      if (args.length == 3)
+      if (args.length >= 3)
         args(2)
       else
         new java.text.SimpleDateFormat("yyyy-MM-DD-HH-mm-ss").format(
