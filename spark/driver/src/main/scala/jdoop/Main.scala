@@ -62,14 +62,20 @@ object Main {
       case _ => None
     }
 
+    val containerOpts = List(
+      "--clear-env",
+      "--set-var", javaToolOptions
+    )
+
     // runs a command in a container
     def in_container(cmd: String)(implicit container: String): Int =
-      (s"sudo lxc-attach --clear-env --name $container -- " + cmd).!
+      (s"sudo lxc-attach " + containerOpts.mkString(" ") +
+        s" --name $container -- " + cmd).!
 
     // runs a command in a container
     def in_containerSeq(cmdArgs: List[String])(implicit container: String): Int = {
-      lazy val lxcCmd = List("sudo", "lxc-attach", "--clear-env", "--name",
-        container, "--")
+      val lxcCmd = List("sudo", "lxc-attach") ++ containerOpts ++
+        List("--name", container, "--")
       Process(lxcCmd ++ cmdArgs) !
     }
 

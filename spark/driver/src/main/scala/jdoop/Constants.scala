@@ -21,7 +21,7 @@ package jdoop
 object Constants {
   val totalCpuCores = 16
   val coresPerContainer = 4
-  val memoryPerContainer = 8L * 1024 * 1024 * 1024 // 8 GB
+  val memoryPerContainer = 8L << 30 // 8 GB
   val cpuCoresFilePath = Seq(
     System.getProperty("java.io.tmpdir"),
     "cpu-cores"
@@ -34,4 +34,11 @@ object Constants {
   val scratchResultsRoot = "/mnt/scratch/sf110-results"
   val finalResultsRoot = "/mnt/storage/sf110-results"
   val sfRoot = "/mnt/storage/sf110"
+
+  // an environment variable that is passed in to the JVM:
+  // https://bugs.openjdk.java.net/browse/JDK-4971166
+  val javaToolOptions = Seq(
+    s"-Xmx${(memoryPerContainer * 0.9).toLong}" // 10% less than a
+                                                // container has
+  ) mkString("JAVA_TOOL_OPTIONS=\"", " ", "\"")
 }
