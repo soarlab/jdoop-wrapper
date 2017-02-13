@@ -38,18 +38,36 @@ object Stats {
 
   val bothCovTypes = Seq(InstructionCov, BranchCov)
 
-  case class CovMetric(covered: Int, total: Int, count: Int = 1) {
+  case class CovMetric(covered: Seq[Int], total: Int) {
     def +(that: CovMetric): CovMetric = {
       require(total == that.total)
 
-      CovMetric(covered + that.covered, total, count + that.count)
+      CovMetric(covered ++ that.covered, total)
     }
-    lazy val coveredNorm: Double = covered.toDouble / count
-    lazy val ratio: Double = if (total == 0) 0.0 else coveredNorm / total
-    lazy val percentage: Double = 100.0 * ratio
-    override def toString: String =
-      "%.1f".format(coveredNorm) + " / " + total +
-        " (" + "%2.1f".format(percentage) + "%)"
+
+    lazy val coveredAvg: Double = covered.sum.toDouble / covered.length
+    lazy val ratioAvg: Double = if (total == 0) 0.0 else coveredAvg / total
+    lazy val percentageAvg: Double = 100.0 * ratioAvg
+    lazy val stdDev: Double = Math.sqrt(
+      (covered.map{ c => (c - coveredAvg).toLong * (c - coveredAvg) }
+        .sum
+        .toDouble
+      ) / covered.length
+    )
+
+    override def toString: String = Seq(
+      "%.1f".format(coveredAvg),
+      "±",
+      "%.1f".format(stdDev),
+      "/",
+      total,
+      "(" + "%2.1f".format(percentageAvg) + "%)"
+    ) mkString(" ")
+  }
+
+  object CovMetric {
+    def apply(covered: Int, total: Int): CovMetric =
+      new CovMetric(Seq(covered), total)
   }
 
   type Time = Int
