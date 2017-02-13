@@ -27,9 +27,37 @@ import sys.process._
 
 object Main {
 
+  sealed trait Tool
+  case object JDoop    extends Tool
+  case object Randoop  extends Tool
+  case object EvoSuite extends Tool
+
+  val toolTaskMap = Map[Tool, Task => Unit](
+    JDoop    -> (runSF110JDoopTask _),
+    Randoop  -> (runSF110RandoopTask _),
+    EvoSuite -> (runSF110EvoSuiteTask _)
+  )
+
+  case class Env(
+    tool: Tool,
+    benchmarkList: Seq[String],
+    timelimit: Int,
+    fullScratchResultsDir: String,
+    loc: Map[String, String],
+    resultsSuffixDir: String
+  )
+
   def mkFilePath(xs: String*): String = new File(xs.mkString("/")).getPath
 
-  def runSF100JDoopTask(task: Task): Unit = {
+  def runSF110RandoopTask(task: Task): Unit = {
+    // TODO
+  }
+
+  def runSF110EvoSuiteTask(task: Task): Unit = {
+    // TODO
+  }
+
+  def runSF110JDoopTask(task: Task): Unit = {
     import Constants._
     import CPUCoresUtil._
     import java.io.File
@@ -203,41 +231,54 @@ object Main {
     )
 
   def usage(): Unit = {
-    println("One argument needed: <list-of-benchmarks.txt>")
+    println("Two arguments needed: <list-of-benchmarks.txt> " +
+      "<jdoop|randoop|evosuite>")
     println("Optional argument: <time limit> in seconds")
     println("Optional argument: <name> for the experiment name")
     sys.exit(1)
   }
 
-  def main(args: Array[String]): Unit = {
-    if (args.length < 1 || args.length > 3)
+  def unsafePrepareEnv(args: IndexedSeq[String]): Env = {
+    if (args.length < 1 || args.length > 4)
       usage()
 
     val source = scala.io.Source.fromFile(args(0))
     val benchmarkList =
       try source.mkString.split("\n").toSeq finally source.close()
+
+    val tool = args(1).toLowerCase match {
+      case "jdoop"    => JDoop
+      case "randoop"  => Randoop
+      case "evosuite" => EvoSuite
+      case _          => usage(); JDoop // just to make the type checker happy
+    }
+
     val timelimit =
-      if (args.length >= 2)
-        try args(1).toInt catch {case _: Throwable => usage(); 0}
+      if (args.length >= 3)
+        try args(2).toInt catch {case _: Throwable => usage(); 0}
         // 0 is at the end of the catch block in order to make the
         // block's type be Int so it lines up with the type of the try
         // block.
       else defaultTimelimit // the default time limit of 30 seconds
     val experimentName =
-      if (args.length >= 3)
-        args(2)
+      if (args.length >= 4)
+        args(3)
       else
         new java.text.SimpleDateFormat("yyyy-MM-DD-HH-mm-ss").format(
           new java.util.Date())
-    val resultsSuffixDir = mkFilePath(experimentName, timelimit.toString)
-    val fullScracthResultsDir = mkFilePath(scratchResultsRoot, resultsSuffixDir)
+    val resultsSuffixDir = mkFilePath(
+      experimentName,
+      tool.toString.toLowerCase,
+      timelimit.toString
+    )
+    val fullScratchResultsDir = mkFilePath(scratchResultsRoot, resultsSuffixDir)
 
     val loc = workerMachines.foldLeft(Map[String, String]()){
       (map, machine) => map +
-      (machine -> fullScracthResultsDir)
+      (machine -> fullScratchResultsDir)
     }
     val failed = initResDirs(
-      loc + ("localhost" -> fullScracthResultsDir),
+      loc + ("localhost" -> fullScratchResultsDir),
       benchmarkList
     )
     if (failed) {
@@ -247,7 +288,22 @@ object Main {
 
     pushCgroupsFile(loc.keySet, cpuCoresFilePath)
 
-    val conf = new SparkConf().setAppName("JDoop Executor")
+    Env(
+      tool,
+      benchmarkList,
+      timelimit,
+      fullScratchResultsDir,
+      loc,
+      resultsSuffixDir
+    )
+  }
+
+  def main(args: Array[String]): Unit = {
+
+    val env = unsafePrepareEnv(args)
+    import env._
+
+    val conf = new SparkConf().setAppName(s"${tool.toString} Executor")
     val sc = new SparkContext(conf)
 
     val distBenchmarks = parallelizeBenchmarks(
@@ -255,16 +311,16 @@ object Main {
       sc,
       timelimit,
       sfRoot,
-      fullScracthResultsDir
+      fullScratchResultsDir
     )
 
-    val r = distBenchmarks.map{runSF100JDoopTask}.reduce{(_, _) => ()}
+    val r = distBenchmarks.map{toolTaskMap(tool)}.reduce{(_, _) => ()}
     println(r) // I'm not sure if this is needed, but in case it is,
                // it will enforce 'r' to be evaluated.
     sc.stop()
 
     pullResults(
-      loc + ("localhost" -> fullScracthResultsDir),
+      loc + ("localhost" -> fullScratchResultsDir),
       mkFilePath(finalResultsRoot, resultsSuffixDir)
     )
 
