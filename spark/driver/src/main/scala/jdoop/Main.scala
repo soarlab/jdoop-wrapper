@@ -20,7 +20,7 @@ package jdoop
 
 import Constants._
 import CPUCoresUtil._
-import java.io._
+import java.io.File
 import org.apache.spark.{SparkConf, SparkContext}
 import org.apache.spark.rdd.RDD
 import sys.process._
@@ -58,12 +58,7 @@ object Main {
   }
 
   def runSF110JDoopTask(task: Task): Unit = {
-    import Constants._
-    import CPUCoresUtil._
-    import java.io.File
-    import java.nio.file.{Files, Path}
     import scala.util.matching.Regex
-    import sys.process._
 
     /**
       *  Recursively searches all files matching a regular expression.
