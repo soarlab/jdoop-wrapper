@@ -49,7 +49,7 @@ object Stats {
     lazy val ratioAvg: Double = if (total == 0) 0.0 else coveredAvg / total
     lazy val percentageAvg: Double = 100.0 * ratioAvg
     lazy val stdDev: Double = Math.sqrt(
-      (covered.map{ c => (c - coveredAvg).toLong * (c - coveredAvg) }
+      (covered.map{ c => (c - coveredAvg) * (c - coveredAvg) }
         .sum
         .toDouble
       ) / covered.length
