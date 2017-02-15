@@ -124,27 +124,21 @@ abstract class RunTask(task: Task) {
     */
   def run(): Unit = {
     s"mkdir -p ${task.hostWorkDir}".!
-
     val toolCmd = List(
       "su", "--login", "-c",
       innerToolCmd mkString " ",
       lxcUser
     )
-
     val containerCores = GetContainerCores(coresPerContainer)
-
     for {
       _ <- startContainer(containerCores)
       _ <- in_containerSeq(toolCmd)
     } yield ()
-
     // Stop the container (this will also destroy it because it is
     // ephemeral). We are running this outside the for comprehension
     // to make sure the container is destroyed.
     s"sudo lxc-stop --name ${task.containerName}".!
-
     ReleaseContainerCores(containerCores)
-
     s"sudo chown -R ${System.getenv("USER")}: ${task.hostWorkDir}".!
   }
 }
@@ -157,19 +151,23 @@ object RunTask {
     case EvoSuite => new RunEvoSuiteTask(task)
   }).run()
 
-  protected class RunJDoopTask(task: Task) extends RunTask(task) {
+  sealed protected class RunJDoopTask(task: Task) extends RunTask(task) {
 
     val jDoopDependencyDir = s"/home/$lxcUser/jdoop-project"
     val toolDir = s"/home/$lxcUser/jdoop"
     val baseContainerName = "jdoop"
+    protected val tool: Tool = JDoop
 
     // A command for starting JDoop on the benchmark
-    val innerToolCmd = Seq(
+    lazy val innerToolCmd = Seq(
       "cd",
       workDir,
       "&&",
       "python",
-      s"$toolDir/jdoop.py",
+      s"$toolDir/jdoop.py"
+    ) ++
+    (if (tool == Randoop) Seq("--randoop-only") else Seq()) ++
+    Seq(
       "--root",
       Main.mkFilePath(benchmarkDir, relativeSrcDir),
       "--timelimit", task.timelimit.toString,
@@ -187,8 +185,11 @@ object RunTask {
     (if (dependencyLibs != "") Seq("--classpath", dependencyLibs) else Seq())
   }
 
-  // TODO: Actually implement the two classes
-  private class RunRandoopTask(task: Task) extends RunJDoopTask(task)
+  private class RunRandoopTask(task: Task) extends RunJDoopTask(task) {
+    override protected val tool: Tool = Randoop
+  }
+
+  // TODO: Actually implement the EvoSuite class
   private class RunEvoSuiteTask(task: Task) extends RunJDoopTask(task)
 }
 
