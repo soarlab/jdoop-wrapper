@@ -25,6 +25,23 @@ WRAPPER_HOME="$(cd "`dirname "$0"`"/..; pwd)"
 cd $WRAPPER_HOME/spark/driver
 sbt compile
 sbt assembly
+
+echo "Stopping all containers..."
 ${WRAPPER_HOME}/lxc/stop-containers.scala
+
 cd -
-${SPARK_HADOOP_DIR}/bin/spark-submit --class jdoop.Main --master spark://${SPARK_MASTER_HOST}:7077 /users/marko/jdoop-wrapper/spark/driver/target/scala-2.11/jdoop-spark-application-assembly-1.0.jar /users/marko/jdoop-wrapper/sf110/benchmarks-that-work-with-jdoop.txt
+${WRAPPER_HOME}/spark/stop-all.sh || true
+${WRAPPER_HOME}/spark/start-spark-all.sh
+
+echo "Starting the Spark application..."
+JAR_FILE=/users/marko/jdoop-wrapper/spark/driver/target/scala-2.11/jdoop-spark-application-assembly-1.0.jar
+# MASTER=local[4]
+MASTER=spark://${SPARK_MASTER_HOST}:7077
+INPUT_LIST=/users/marko/jdoop-wrapper/sf110/a-random-subset-of-10-benchmarks.txt
+# INPUT_LIST=/users/marko/jdoop-wrapper/sf110/benchmarks-that-work-with-jdoop.txt
+TOOL=randoop
+TIMELIMIT=30
+EXP_NAME=test9
+
+${SPARK_HADOOP_DIR}/bin/spark-submit --class jdoop.Main --master $MASTER \
+		   ${JAR_FILE} ${INPUT_LIST} $TOOL $TIMELIMIT ${EXP_NAME}
