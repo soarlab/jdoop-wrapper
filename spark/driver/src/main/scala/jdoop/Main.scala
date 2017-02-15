@@ -19,24 +19,13 @@ package jdoop
 
 
 import Constants._
-import CPUCoresUtil._
 import java.io.File
 import org.apache.spark.{SparkConf, SparkContext}
 import org.apache.spark.rdd.RDD
 import sys.process._
 
+
 object Main {
-
-  sealed trait Tool
-  case object JDoop    extends Tool
-  case object Randoop  extends Tool
-  case object EvoSuite extends Tool
-
-  val toolTaskMap = Map[Tool, Task => Unit](
-    JDoop    -> (runSF110JDoopTask _),
-    Randoop  -> (runSF110RandoopTask _),
-    EvoSuite -> (runSF110EvoSuiteTask _)
-  )
 
   case class Env(
     tool: Tool,
@@ -48,138 +37,6 @@ object Main {
   )
 
   def mkFilePath(xs: String*): String = new File(xs.mkString("/")).getPath
-
-  def runSF110RandoopTask(task: Task): Unit = {
-    // TODO
-  }
-
-  def runSF110EvoSuiteTask(task: Task): Unit = {
-    // TODO
-  }
-
-  def runSF110JDoopTask(task: Task): Unit = {
-    import scala.util.matching.Regex
-
-    /**
-      *  Recursively searches all files matching a regular expression.
-      *
-      *  @param f A root directory where the search should start
-      *  @param r A regular expression matching names of files to be returned
-      *  @return A stream of files found by the search
-      */
-    def recursiveListFiles(f: File, r: Regex): Stream[File] = {
-      require(f.isDirectory())
-
-      val currentDirFiles = f.listFiles.toStream
-      val matching = currentDirFiles.filter(
-        f => r.findFirstIn(f.getName).isDefined)
-        .toStream
-      matching append currentDirFiles.filter(_.isDirectory)
-        .flatMap(recursiveListFiles(_, r))
-    }
-
-    // converts an Int into an Option around Unit representing a process
-    // success or failure
-    implicit def liftRV(rv: Int): Option[Unit] = rv match {
-      case 0 => Some(())
-      case _ => None
-    }
-
-    val containerOpts = List(
-      "--clear-env",
-      "--set-var", javaToolOptions
-    )
-
-    // runs a command in a container
-    def in_container(cmd: String)(implicit container: String): Int =
-      (s"sudo lxc-attach " + containerOpts.mkString(" ") +
-        s" --name $container -- " + cmd).!
-
-    // runs a command in a container
-    def in_containerSeq(cmdArgs: List[String])(implicit container: String): Int = {
-      val lxcCmd = List("sudo", "lxc-attach") ++ containerOpts ++
-        List("--name", container, "--")
-      Process(lxcCmd ++ cmdArgs) !
-    }
-
-    val baseContainerName = "jdoop"
-    val benchmarkDir = "/benchmark"
-    val workDir = "/work"
-    val lxcUser = "debian"
-    val jdoopDir = s"/home/$lxcUser/jdoop"
-    val jDoopDependencyDir = s"/home/$lxcUser/jdoop-project"
-    val testsDir = "tests"
-    val relativeSrcDir = "src/src/main/java"
-    val relativeBinDir = "bin"
-    val dependencyLibs = recursiveListFiles(
-      new File(mkFilePath(task.hostBenchmarkDir, s"/$relativeBinDir/lib")),
-      """.*\.jar""".r
-    ).mkString(":").replaceAll(task.hostBenchmarkDir, benchmarkDir)
-    s"mkdir -p ${task.hostWorkDir}".!
-
-    implicit val containerName: String = task.containerName
-
-    // A command for starting JDoop on the benchmark
-    val innerJDoopCmd = Seq(
-      "cd",
-      workDir,
-      "&&",
-      "python",
-      s"$jdoopDir/jdoop.py",
-      "--root",
-      mkFilePath(benchmarkDir, relativeSrcDir),
-      "--timelimit", task.timelimit,
-      "--jpf-core-path", s"$jDoopDependencyDir/jpf-core",
-      "--jdart-path", s"$jDoopDependencyDir/jdart",
-      "--sut-compilation",
-      mkFilePath(benchmarkDir, relativeBinDir),
-      "--test-compilation", testsDir,
-      "--junit-path", s"$jdoopDir/lib/junit4.jar",
-      "--hamcrest-path", s"$jdoopDir/lib/hamcrest-core-1.3.jar",
-      "--randoop-path", s"$jdoopDir/lib/randoop.jar",
-      "--jacoco-path", s"$jdoopDir/lib/jacocoant.jar",
-      "--generate-report"
-    ) ++
-    (if (dependencyLibs != "") Seq("--classpath", dependencyLibs) else Seq())
-    val jdoopCmd = List(
-      "su", "--login", "-c",
-      innerJDoopCmd mkString " ",
-      lxcUser
-    )
-
-    val containerCores = GetContainerCores(coresPerContainer)
-
-    for {
-      _ <- s"sudo chown 1000:1000 ${task.hostWorkDir}".!
-      // create an ephemeral container for jdoop with an overlay fs
-      _ <- (s"sudo lxc-copy --ephemeral --name $baseContainerName " +
-        s"--newname ${task.containerName} " +
-        s"--mount bind=${task.hostBenchmarkDir}:$benchmarkDir:ro," +
-        s"bind=${task.hostWorkDir}:$workDir").!
-      // sleep for a few seconds to make sure a network device is
-      // ready
-      _ <- "sleep 5s".!
-      // Constraining CPU and memory usage
-      _ <- (s"sudo lxc-cgroup --name ${task.containerName} " +
-        s"cpuset.cpus " + containerCores.mkString(",")).!
-      _ <- (s"sudo lxc-cgroup --name ${task.containerName} " +
-        s"memory.limit_in_bytes $memoryPerContainer").!
-      // disable the swap memory in the container
-      // _ <- (s"sudo lxc-cgroup --name ${task.containerName} " +
-      //   s"memory.memsw.limit_in_bytes 0").!
-      _ <- s"sudo lxc-info --name ${task.containerName} --state".!
-      _ <- in_containerSeq(jdoopCmd)
-    } yield ()
-
-    // Stop the container (this will also destroy it because it is
-    // ephemeral). We are running this outside the for comprehension
-    // to make sure the container is destroyed.
-    s"sudo lxc-stop --name ${task.containerName}".!
-
-    ReleaseContainerCores(containerCores)
-
-    s"sudo chown -R ${System.getenv("USER")}: ${task.hostWorkDir}".!
-  }
 
   /**
     * Creates result directories if they don't exist and makes sure no
@@ -309,9 +166,7 @@ object Main {
       fullScratchResultsDir
     )
 
-    val r = distBenchmarks.map{toolTaskMap(tool)}.reduce{(_, _) => ()}
-    println(r) // I'm not sure if this is needed, but in case it is,
-               // it will enforce 'r' to be evaluated.
+    val r = distBenchmarks.map{RunTask(tool)}.reduce{(_, _) => ()}
     sc.stop()
 
     pullResults(
