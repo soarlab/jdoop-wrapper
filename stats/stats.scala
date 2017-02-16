@@ -231,7 +231,10 @@ object Stats {
     stats foreach { case (t, set) =>
       println(s"Timelimit: $t")
       println("Results:")
-      set foreach println
+      set
+        .toSeq
+        .sortBy(b => b.proj.projectDir.split("_")(0).toInt)
+        .foreach{println}
     }
   }
 }
