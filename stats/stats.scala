@@ -86,6 +86,13 @@ object Stats {
         timelimit
       )
     }
+
+    override def toString: String = Seq(
+      proj.projectDir + ":",
+      "branch", "=", branchCov + ",",
+      "instruction", "=", instructionCov + ",",
+      "timelimit", "=", timelimit.toString, "s"
+    ).mkString(" ")
   }
 
   def processStats(stats: Seq[BenchmarkStats]): Map[Time, Set[BenchmarkStats]] = {
