@@ -39,6 +39,7 @@ object PrepareStorage {
 
   val pkgs = """
     unzip
+    openjdk-8-jdk
     """.split("\n").map{_.trim}.filter{!_.isEmpty}
 
   // converts an Int into an Option around Unit representing a process
