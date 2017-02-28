@@ -44,7 +44,7 @@ object Containers {
       .map{_.trim}
       .filter{!_.isEmpty}
       .toSeq
-    containers foreach { c => s"ssh $host sudo lxc-stop --name $c".! }
+    containers foreach { c => s"ssh $host sudo lxc-stop --kill --name $c".! }
   }
 
   def main(args: Array[String]): Unit = {
