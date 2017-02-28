@@ -81,7 +81,7 @@ object Stats {
     proj: SF110Project,
     branchCov: CovMetric,
     instructionCov: CovMetric,
-    cyclomaticCtxy: CovMetric,
+    cyclomaticCxty: CovMetric,
     timelimit: Time
   ) {
     def +(that: BenchmarkStats): BenchmarkStats = {
@@ -91,17 +91,16 @@ object Stats {
         proj,
         branchCov + that.branchCov,
         instructionCov + that.instructionCov,
-        cyclomaticCtxy + that.cyclomaticCtxy,
+        cyclomaticCxty + that.cyclomaticCxty,
         timelimit
       )
     }
 
     override def toString: String = Seq(
       proj.projectDir + ":",
-      "branch", "=", branchCov + ",",
-      "instruction", "=", instructionCov + ",",
-      "complexity", "=", cyclomaticCtxy + ",",
-      "timelimit", "=", timelimit.toString, "s"
+      "brnch", "=", branchCov + ",",
+      "instr", "=", instructionCov + ",",
+      "cxty", "=", cyclomaticCxty
     ).mkString(" ")
   }
 
@@ -226,7 +225,7 @@ object Stats {
             proj = SF110Project(extProjDir(f)),
             branchCov = covMap.getOrElse(BranchCov, CovMetric(0, 0)),
             instructionCov = covMap.getOrElse(InstructionCov, CovMetric(0, 0)),
-            cyclomaticCtxy = covMap.getOrElse(
+            cyclomaticCxty = covMap.getOrElse(
               CyclomaticComplexity, CovMetric(0, 0)
             ),
             timelimit = extTimelimit(f)
