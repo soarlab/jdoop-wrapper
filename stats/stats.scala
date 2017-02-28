@@ -36,7 +36,7 @@ object Stats {
     override def toString = "INSTRUCTION"
   }
 
-  val bothCovTypes = Seq(InstructionCov, BranchCov)
+  val bothCovTypes = Set[CovType](InstructionCov, BranchCov)
 
   case class CovMetric(covered: Seq[Int], total: Int) {
     def +(that: CovMetric): CovMetric = {
@@ -162,7 +162,7 @@ object Stats {
       Some(CovMetric(covered, covered + missed))
     }
 
-  def covFromFile(covTypes: Seq[CovType])(f: File):
+  def covFromFile(covTypes: Set[CovType])(f: File):
       Option[Map[CovType, CovMetric]] =
     for {
       e <- jacocoReport(f)
@@ -174,7 +174,7 @@ object Stats {
       } yield t -> m
     ).toMap
   
-  def covForFiles(cov: Map[File, Seq[CovType]]):
+  def covForFiles(cov: Map[File, Set[CovType]]):
       Map[File, Option[Map[CovType, CovMetric]]] =
     cov.keySet.foldRight(Map[File, Option[Map[CovType, CovMetric]]]()){ (f, acc) =>
       acc + (f -> covFromFile(cov(f))(f))
@@ -192,7 +192,7 @@ object Stats {
   def extProjDir(f: File): String = extfromPathEnd(f, 2)
   def extTimelimit(f: File): Time = extfromPathEnd(f, 3).toInt
 
-  def reportMap: Seq[String] => Map[File, Seq[CovType]] = dirs =>
+  def reportMap: Seq[String] => Map[File, Set[CovType]] = dirs =>
     (for {
       dir <- dirs
       bm  <- benchmarksInDir(new File(dir))
