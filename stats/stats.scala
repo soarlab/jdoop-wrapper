@@ -35,8 +35,15 @@ object Stats {
   case object InstructionCov extends CovType {
     override def toString = "INSTRUCTION"
   }
+  case object CyclomaticComplexity extends CovType {
+    override def toString = "COMPLEXITY"
+  }
 
-  val bothCovTypes = Set[CovType](InstructionCov, BranchCov)
+  val allCovTypes = Set[CovType](
+    InstructionCov,
+    BranchCov,
+    CyclomaticComplexity
+  )
 
   case class CovMetric(covered: Seq[Int], total: Int) {
     def +(that: CovMetric): CovMetric = {
@@ -74,6 +81,7 @@ object Stats {
     proj: SF110Project,
     branchCov: CovMetric,
     instructionCov: CovMetric,
+    cyclomaticCtxy: CovMetric,
     timelimit: Time
   ) {
     def +(that: BenchmarkStats): BenchmarkStats = {
@@ -83,6 +91,7 @@ object Stats {
         proj,
         branchCov + that.branchCov,
         instructionCov + that.instructionCov,
+        cyclomaticCtxy + that.cyclomaticCtxy,
         timelimit
       )
     }
@@ -91,6 +100,7 @@ object Stats {
       proj.projectDir + ":",
       "branch", "=", branchCov + ",",
       "instruction", "=", instructionCov + ",",
+      "complexity", "=", cyclomaticCtxy + ",",
       "timelimit", "=", timelimit.toString, "s"
     ).mkString(" ")
   }
@@ -201,7 +211,7 @@ object Stats {
         Seq(dir, bm.projectDir, "jacoco-site", "report.xml")
           .mkString("/")
       ),
-      bothCovTypes
+      allCovTypes
     ))
     ).toMap
 
@@ -216,6 +226,9 @@ object Stats {
             proj = SF110Project(extProjDir(f)),
             branchCov = covMap.getOrElse(BranchCov, CovMetric(0, 0)),
             instructionCov = covMap.getOrElse(InstructionCov, CovMetric(0, 0)),
+            cyclomaticCtxy = covMap.getOrElse(
+              CyclomaticComplexity, CovMetric(0, 0)
+            ),
             timelimit = extTimelimit(f)
           )
           bmstats :: acc
