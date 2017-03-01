@@ -178,7 +178,7 @@ object Stats {
           .mkString("/")
       ))
       val tcCounter = <counter type={TestCaseCount.toString} missed="0"
-      covered={testCaseCount.toString}/>: Node
+        covered={testCaseCount.toString}/>: Node
 
       <report>{counters ++ tcCounter}</report>
     }
