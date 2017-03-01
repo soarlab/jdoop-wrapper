@@ -169,7 +169,7 @@ object Stats {
       * Extends coverage information from a JaCoCo report with the
       * number of test cases executed.
       */
-    def extendedReport(f: File): Elem = {
+    def extendedReport: Elem = {
       val report = MyXML.loadFile(f)
       val counters = report \ "counter"
       val testCaseCount = tcCountFromFile(new File(
@@ -183,7 +183,7 @@ object Stats {
       <report>{counters ++ tcCounter}</report>
     }
 
-    try Some(extendedReport(f)) catch { case _: Throwable => None }
+    try Some(extendedReport) catch { case _: Throwable => None }
   }
 
   def findCovMetric(e: Elem)(covType: CovType): Option[Node] = {
