@@ -38,11 +38,15 @@ object Stats {
   case object CyclomaticComplexity extends CovType {
     override def toString = "COMPLEXITY"
   }
+  case object TestCaseCount extends CovType {
+    override def toString = "TCCOUNT"
+  }
 
   val allCovTypes = Set[CovType](
     InstructionCov,
     BranchCov,
-    CyclomaticComplexity
+    CyclomaticComplexity,
+    TestCaseCount
   )
 
   case class CovMetric(covered: Seq[Int], total: Int) {
@@ -60,10 +64,14 @@ object Stats {
         covered.length
     )
 
-    override def toString: String = Seq(
+    def toStringSub: String = Seq(
       "%.1f".format(coveredAvg),
       "±",
-      "%.1f".format(stdDev),
+      "%.1f".format(stdDev)
+    ) mkString(" ")
+
+    override def toString: String = Seq(
+      toStringSub,
       "/",
       total,
       "(" + "%2.1f".format(percentageAvg) + "%)"
@@ -82,6 +90,7 @@ object Stats {
     branchCov: CovMetric,
     instructionCov: CovMetric,
     cyclomaticCxty: CovMetric,
+    testCaseCount: CovMetric,
     timelimit: Time
   ) {
     def +(that: BenchmarkStats): BenchmarkStats = {
@@ -92,6 +101,7 @@ object Stats {
         branchCov + that.branchCov,
         instructionCov + that.instructionCov,
         cyclomaticCxty + that.cyclomaticCxty,
+        testCaseCount + that.testCaseCount,
         timelimit
       )
     }
@@ -100,7 +110,8 @@ object Stats {
       proj.projectDir + ":",
       "brnch", "=", branchCov + ",",
       "instr", "=", instructionCov + ",",
-      "cxty", "=", cyclomaticCxty
+      "cxty", "=", cyclomaticCxty + ",",
+      "# tests", "=", testCaseCount.toStringSub
     ).mkString(" ")
   }
 
@@ -148,8 +159,32 @@ object Stats {
     }
   }
 
-  def jacocoReport(f: File): Option[Elem] =
-    try Some(MyXML.loadFile(f)) catch { case _: Throwable => None }
+  def tcCountFromFile(f: File): Int = {
+    val source = scala.io.Source.fromFile(f)
+    try source.mkString.split("\n").toSeq(0).toInt finally source.close()
+  }
+
+  def jacocoReport(f: File): Option[Elem] = {
+    /**
+      * Extends coverage information from a JaCoCo report with the
+      * number of test cases executed.
+      */
+    def extendedReport(f: File): Elem = {
+      val report = MyXML.loadFile(f)
+      val counters = report \ "counter"
+      val testCaseCount = tcCountFromFile(new File(
+        // dropRight(2) drops the jacoco-site/report.xml part
+        (f.getPath.split("/").dropRight(2) ++ Seq("test-case-count.txt"))
+          .mkString("/")
+      ))
+      val tcCounter = <counter type={TestCaseCount.toString} missed="0"
+      covered={testCaseCount.toString}/>: Node
+
+      <report>{counters ++ tcCounter}</report>
+    }
+
+    try Some(extendedReport(f)) catch { case _: Throwable => None }
+  }
 
   def findCovMetric(e: Elem)(covType: CovType): Option[Node] = {
     val counters: NodeSeq = e \ "counter"
@@ -228,6 +263,10 @@ object Stats {
             cyclomaticCxty = covMap.getOrElse(
               CyclomaticComplexity, CovMetric(0, 0)
             ),
+            testCaseCount = covMap.getOrElse(
+              TestCaseCount,
+              CovMetric(0, 0)
+            ).copy(total = 1), // needed so we can add up multiple executions
             timelimit = extTimelimit(f)
           )
           bmstats :: acc
