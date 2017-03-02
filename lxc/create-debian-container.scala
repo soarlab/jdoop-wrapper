@@ -36,7 +36,7 @@ object DebianContainer {
   // A Debian release
   val defaultDebianRelease = "stretch"
   // A valid time stamp for the Debian Snapshot Archive
-  val defaultTimestamp = "20161022T104905Z"
+  val defaultTimestamp = "20170128T211018Z"
 
   def main(args: Array[String]): Unit = {
     val template = if (args.length > 0) args(0) else defaultTemplate
