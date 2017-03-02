@@ -39,22 +39,16 @@ object Main {
   def mkFilePath(xs: String*): String = new File(xs.mkString("/")).getPath
 
   /**
-    * Creates result directories if they don't exist and makes sure no
-    * prior benchmark results for the same benchmarks are in way.
+    * Creates result directories if they don't exist.
+    *
     * @param loc A map of machines and result directories
-    * @param benchmarkList A list of benchmarks
-    * @return False if some benchmark result directories already exist, 
-    *         true otherwise.
     */
-  def initResDirs(loc: Map[String, String],
-    benchmarkList: Seq[String]): Boolean =
-    (loc foldLeft false) { (failed, kv) =>
-      val (machine, dir) = kv
+  def initResDirs(loc: Map[String, String], localDir: File): Unit = {
+    loc foreach { case (machine, dir) =>
       s"ssh $machine mkdir -p $dir".!
-      failed || (benchmarkList foldLeft false){ (bFailed, benchmarkDir) =>
-        bFailed || ((s"ssh $machine file -E $dir/$benchmarkDir".!) == 0)
-      }
     }
+    s"mkdir -p ${localDir.getPath}".!
+  }
 
   def pullResults(loc: Map[String, String], localDir: String): Unit = {
     s"mkdir -p $localDir".!
@@ -70,14 +64,16 @@ object Main {
   }
 
   def parallelizeBenchmarks(benchmarkList: Seq[String], sc: SparkContext,
-    timelimit: Int, sfRoot: String, sfResultsRoot: String): RDD[Task] =
+    timelimit: Int, sfRoot: String, sfResultsRoot: String,
+    masterNodeDir: File): RDD[Task] =
     sc.parallelize(
       benchmarkList map { b => Task(
         project = SF110Project(b),
         containerName = b,
         timelimit = timelimit,
         hostBenchmarkDir = mkFilePath(sfRoot, b),
-        hostWorkDir = mkFilePath(sfResultsRoot, b))
+        hostWorkDir = mkFilePath(sfResultsRoot, b),
+        masterNodeDir = masterNodeDir)
       },
       benchmarkList.length // the number of partitions of the data
     )
@@ -129,14 +125,10 @@ object Main {
       (map, machine) => map +
       (machine -> fullScratchResultsDir)
     }
-    val failed = initResDirs(
+    initResDirs(
       loc + ("localhost" -> fullScratchResultsDir),
-      benchmarkList
+      new File(mkFilePath(finalResultsRoot, resultsSuffixDir))
     )
-    if (failed) {
-      println("Remove existing colliding benchmark directories first!")
-      sys.exit(1)
-    }
 
     pushCgroupsFile(loc.keySet, cpuCoresFilePath)
 
@@ -163,16 +155,12 @@ object Main {
       sc,
       timelimit,
       sfRoot,
-      fullScratchResultsDir
+      fullScratchResultsDir,
+      new File(mkFilePath(finalResultsRoot, resultsSuffixDir))
     )
 
     val r = distBenchmarks.map{RunTask(tool)}.reduce{(_, _) => ()}
     sc.stop()
-
-    pullResults(
-      loc + ("localhost" -> fullScratchResultsDir),
-      mkFilePath(finalResultsRoot, resultsSuffixDir)
-    )
 
     println("Results are available in: " +
       mkFilePath(finalResultsRoot, resultsSuffixDir))

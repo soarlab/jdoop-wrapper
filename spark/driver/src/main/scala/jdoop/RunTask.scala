@@ -63,6 +63,8 @@ abstract class RunTask(task: Task) {
 
   implicit val containerName: String = task.containerName
 
+  val totalTimeFilePath = Main.mkFilePath(task.hostWorkDir, "total-time.txt")
+
   /**
     *  Recursively searches all files matching a regular expression.
     *
@@ -139,6 +141,8 @@ abstract class RunTask(task: Task) {
     * Runs the task.
     */
   def run(): Unit = {
+    val startTime = System.nanoTime()
+
     s"mkdir -p ${task.hostWorkDir}".!
     val toolCmd = List(
       "su", "--login", "-c",
@@ -163,9 +167,30 @@ abstract class RunTask(task: Task) {
     )
     tcCountFile.createNewFile()
     printToFile(tcCountFile){_.println(testCaseCount)}
-
     // ... and finally delete them
     deleteGenFiles(testDirRegexs)
+
+    // archive JaCoCo html files
+    val jacocoDir = Some(new File(
+      Main.mkFilePath(task.hostWorkDir, "jacoco-site")))
+    if (jacocoDir.get.exists) {
+      Process(Seq("tar", "czf", "html.tar.gz", "html"), jacocoDir).!
+      Process(Seq("rm", "-rf", "html"), jacocoDir).!
+    }
+
+    // record the total time spent on this task and write it to a file
+    val totalTime = (System.nanoTime() - startTime) / 1000000000 // seconds
+    val totalTimeFile = new File(totalTimeFilePath)
+    totalTimeFile.createNewFile()
+    printToFile(totalTimeFile){_.println(totalTime)}
+
+    // sync everything to the master node
+    Process(Seq(
+      "rsync",
+      "-a",
+      task.hostWorkDir,
+      s"$masterMachine:${task.masterNodeDir.getPath}"
+    )).!
   }
 
   def allJavaFiles(dir: File): Stream[File] =
