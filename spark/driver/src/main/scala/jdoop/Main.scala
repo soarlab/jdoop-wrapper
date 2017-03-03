@@ -50,14 +50,6 @@ object Main {
     s"mkdir -p ${localDir.getPath}".!
   }
 
-  def pullResults(loc: Map[String, String], localDir: String): Unit = {
-    s"mkdir -p $localDir".!
-    loc foreach { case (machine, dir) =>
-      println(s"Pulling results from $machine...")
-      s"rsync -a $machine:$dir/ $localDir/".!
-    }
-  }
-
   def pushCgroupsFile(machines: Set[String], path: String): Unit = {
     CPUCoresUtil.generateFile()
     machines foreach { m => s"rsync -a $path $m:$path".! }
