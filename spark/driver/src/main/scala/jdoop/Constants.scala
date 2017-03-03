@@ -27,7 +27,7 @@ object Constants {
     "cpu-cores"
   ).mkString("/")
   val defaultTimelimit = 30 // seconds
-  val totalSparkClusterNodes = 11
+  val totalSparkClusterNodes = 12
   val masterMachine = "node-1.multinode.jpf-doop.emulab.net"
   val workerMachines = (2 to totalSparkClusterNodes) map {
     i => s"node-$i.multinode.jpf-doop.emulab.net"
