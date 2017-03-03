@@ -142,6 +142,7 @@ abstract class RunTask(task: Task) {
     */
   def run(): Unit = {
     val startTime = System.nanoTime()
+    System.err.println(s"Starting task ${task.project.projectDir}")
 
     s"mkdir -p ${task.hostWorkDir}".!
     val toolCmd = List(
