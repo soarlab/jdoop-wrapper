@@ -222,7 +222,7 @@ abstract class RunTask(task: Task) {
 
 object RunTask {
 
-  def apply(tool: Tool)(task: Task): Unit = (tool match {
+  def apply(task: Task): Unit = (task.tool match {
     case JDoop    => new RunJDoopTask(task)
     case Randoop  => new RunRandoopTask(task)
     case EvoSuite => new RunEvoSuiteTask(task)
@@ -233,7 +233,6 @@ object RunTask {
     val jDoopDependencyDir = s"/home/$lxcUser/jdoop-project"
     val toolDir = s"/home/$lxcUser/jdoop"
     val baseContainerName = "jdoop"
-    protected val tool: Tool = JDoop
 
     // A command for starting JDoop on the benchmark
     lazy val innerToolCmd = Seq(
@@ -243,7 +242,7 @@ object RunTask {
       "python",
       s"$toolDir/jdoop.py"
     ) ++
-    (if (tool == Randoop) Seq("--randoop-only") else Seq()) ++
+    (if (task.tool == Randoop) Seq("--randoop-only") else Seq()) ++
     Seq(
       "--root",
       Main.mkFilePath(benchmarkDir, relativeSrcDir),
@@ -272,9 +271,7 @@ object RunTask {
       allJavaFiles(new File(task.hostWorkDir)).filter{isTestCaseFile}.length
   }
 
-  private class RunRandoopTask(task: Task) extends RunJDoopTask(task) {
-    override protected val tool: Tool = Randoop
-  }
+  private class RunRandoopTask(task: Task) extends RunJDoopTask(task)
 
   private class RunEvoSuiteTask(task: Task) extends RunTask(task) {
 

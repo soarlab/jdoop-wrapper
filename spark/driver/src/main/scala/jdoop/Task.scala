@@ -26,4 +26,5 @@ case class Task(
   timelimit: Int,
   hostBenchmarkDir: String,
   hostWorkDir: String,
-  masterNodeDir: java.io.File)
+  masterNodeDir: java.io.File,
+  tool: Tool)
