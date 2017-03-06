@@ -61,8 +61,7 @@ object Main {
 
   def unsafeProcessInputArg(arg: String)(
     timelimit: Int,
-    defaultExpName: String,
-    offset: Int): Seq[Task] = {
+    defaultExpName: String): Seq[Task] = {
 
     val s = arg.split(",")
     val (toolStr, experimentName, repStr, inputFile) = (s(0), s(1), s(2), s(3))
@@ -82,9 +81,8 @@ object Main {
     val multipliedList = ((0 until repetitions) foldRight Seq[(String, Int)]()){
       (r, acc) => acc ++ (benchmarkList zip List.fill(benchmarkList.length)(r))
     }
-    val indices = (0 until multipliedList.length).map{_ + offset}
 
-    (multipliedList zip indices).map{ case (((benchmark, repIndex), index)) =>
+    multipliedList.map{ case ((benchmark, repIndex)) =>
       val resultsSuffixDir = mkFilePath(
         finalExperimentName,
         tool.toString.toLowerCase,
@@ -97,7 +95,7 @@ object Main {
         project = SF110Project(benchmark),
         containerName =
           s"$benchmark-${tool.toString.toLowerCase}-" +
-            s"$finalExperimentName-${index.toString}",
+            s"$finalExperimentName-${repIndex.toString}",
         timelimit = timelimit,
         hostBenchmarkDir = mkFilePath(sfRoot, benchmark),
         hostWorkDir = mkFilePath(
@@ -123,13 +121,11 @@ object Main {
       new java.text.SimpleDateFormat("yyyy-MM-DD-HH-mm-ss").format(
         new java.util.Date())
 
-    val benchmarks: Seq[Task] = (args drop(1) foldRight (Seq[Task](), 0)) {
-      (arg, acc) =>
-      val (accBenchmarks, offset) = acc
-      val newBenchmarks =
-        unsafeProcessInputArg(arg)(timelimit, defaultExperimentName, offset)
-      (accBenchmarks ++ newBenchmarks, offset + newBenchmarks.length)
-    }._1
+    val benchmarks: Seq[Task] = (args drop(1) foldRight Seq[Task]()) {
+      (arg, accBenchmarks) =>
+      accBenchmarks ++
+        unsafeProcessInputArg(arg)(timelimit, defaultExperimentName)
+    }
     val benchmarksShuffled = scala.util.Random.shuffle(benchmarks)
 
     val hostWorkDirs = benchmarks.map{ b => new File(b.hostWorkDir) }.toSet
