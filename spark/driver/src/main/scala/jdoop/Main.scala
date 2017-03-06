@@ -148,9 +148,8 @@ object Main {
     sc.stop()
 
     println("Results are available in:")
-    hostWorkDirs.foreach{ d => println("  " +
-      d.getPath.replaceAll(scratchResultsRoot, finalResultsRoot)
-        .split("/").dropRight(1).mkString("/"))
-    }
+    hostWorkDirs.map{ _.getPath.replace(scratchResultsRoot, finalResultsRoot)
+      .split("/").dropRight(1).mkString("/")
+    }.toSeq.sorted.foreach{d => println(s"  $d")}
   }
 }
