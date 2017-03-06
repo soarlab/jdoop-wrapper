@@ -140,7 +140,9 @@ object Main {
     val env = unsafePrepareEnv(args)
     import env._
 
-    val conf = new SparkConf().setAppName(s"${tools.mkString("-")} Executor")
+    val conf = new SparkConf()
+      .setAppName(s"${tools.mkString("-")} Executor")
+      .set("spark.task.maxFailures", "1") // disables re-attempts
     val sc = new SparkContext(conf)
 
     val distBenchmarks = sc.parallelize(benchmarks, benchmarks.length)
