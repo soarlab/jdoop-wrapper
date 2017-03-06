@@ -42,11 +42,13 @@ echo "Starting the Spark application..."
 JAR_FILE=/users/marko/jdoop-wrapper/spark/driver/target/scala-2.11/jdoop-spark-application-assembly-1.0.jar
 # MASTER=local[4]
 MASTER=spark://${SPARK_MASTER_HOST}:7077
-# INPUT_LIST=/users/marko/jdoop-wrapper/sf110/a-random-subset-of-10-benchmarks.txt
-INPUT_LIST=/users/marko/jdoop-wrapper/sf110/benchmarks-that-work-with-jdoop.txt
-TOOL=randoop
-TIMELIMIT=600
-EXP_NAME=1h-randoop-all-2017-03-02
+INPUT_LIST=/users/marko/jdoop-wrapper/sf110/a-random-subset-of-10-benchmarks.txt
+# INPUT_LIST=/users/marko/jdoop-wrapper/sf110/benchmarks-that-work-with-jdoop.txt
+TIMELIMIT=60
+REP=2
+EXP_NAME=test33
 
 ${SPARK_HADOOP_DIR}/bin/spark-submit --class jdoop.Main --master $MASTER \
-		   ${JAR_FILE} ${INPUT_LIST} $TOOL $TIMELIMIT ${EXP_NAME}
+		   ${JAR_FILE} $TIMELIMIT \
+		   jdoop,${EXP_NAME},$REP,${INPUT_LIST} \
+		   randoop,${EXP_NAME},$REP,${INPUT_LIST} \
