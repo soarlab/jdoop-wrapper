@@ -53,79 +53,94 @@ object Main {
   }
 
   def usage(): Unit = {
-    println("Two arguments needed: <list-of-benchmarks.txt> " +
-      "<jdoop|randoop|evosuite>")
-    println("Optional argument: <time limit> in seconds")
-    println("Optional argument: <name> for the experiment name")
+    println("At least two arguments needed: <timelimit> <task-list...>")
+    println("  task-list = <jdoop|randoop|evosuite>,<experiment-name>," +
+      "<repetitions>,<input-list>")
     sys.exit(1)
   }
 
-  def unsafePrepareEnv(args: IndexedSeq[String]): Env = {
-    if (args.length < 1 || args.length > 4)
-      usage()
+  def unsafeProcessInputArg(arg: String)(
+    timelimit: Int,
+    defaultExpName: String,
+    offset: Int): Seq[Task] = {
 
-    val source = scala.io.Source.fromFile(args(0))
-    val tripleList =
+    val s = arg.split(",")
+    val (toolStr, experimentName, repStr, inputFile) = (s(0), s(1), s(2), s(3))
+    val tool = toolStr.toLowerCase match {
+      case "randoop"  => Randoop
+      case "evosuite" => EvoSuite
+      case _          => JDoop // assume JDoop as default
+    }
+    val finalExperimentName =
+      if (experimentName.isEmpty) defaultExpName
+      else experimentName
+    val repetitions = try repStr.toInt catch { case _: Throwable => 1 }
+
+    val source = scala.io.Source.fromFile(inputFile)
+    val benchmarkList =
       try source.mkString.split("\n").toSeq finally source.close()
+    val multipliedList = ((0 until repetitions) foldRight Seq[(String, Int)]()){
+      (r, acc) => acc ++ (benchmarkList zip List.fill(benchmarkList.length)(r))
+    }
+    val indices = (0 until multipliedList.length).map{_ + offset}
+
+    (multipliedList zip indices).map{ case (((benchmark, repIndex), index)) =>
+      val resultsSuffixDir = mkFilePath(
+        finalExperimentName,
+        tool.toString.toLowerCase,
+        repIndex.toString,
+        timelimit.toString
+      )
+      val masterNodeDir = new File(mkFilePath(
+        finalResultsRoot, resultsSuffixDir))
+      Task(
+        project = SF110Project(benchmark),
+        containerName =
+          s"$benchmark-${tool.toString.toLowerCase}-" +
+            s"$finalExperimentName-${index.toString}",
+        timelimit = timelimit,
+        hostBenchmarkDir = mkFilePath(sfRoot, benchmark),
+        hostWorkDir = mkFilePath(
+          scratchResultsRoot,
+          resultsSuffixDir,
+          benchmark
+        ),
+        masterNodeDir = masterNodeDir,
+        tool = tool
+      )
+    }
+  }
+
+  def unsafePrepareEnv(args: IndexedSeq[String]): Env = {
+    if (args.length < 2) usage()
 
     val timelimit =
-      if (args.length >= 2)
-        try args(1).toInt catch {case _: Throwable => usage(); 0}
-        // 0 is at the end of the catch block in order to make the
-        // block's type be Int so it lines up with the type of the try
-        // block.
-      else defaultTimelimit // the default time limit of 30 seconds
+      try args(0).toInt catch {case _: Throwable => usage(); 0}
+      // 0 is at the end of the catch block in order to make the
+      // block's type be Int so it lines up with the type of the try
+      // block.
     val defaultExperimentName =
-        new java.text.SimpleDateFormat("yyyy-MM-DD-HH-mm-ss").format(
-          new java.util.Date())
+      new java.text.SimpleDateFormat("yyyy-MM-DD-HH-mm-ss").format(
+        new java.util.Date())
 
-    val benchmarks: Seq[Task] = (tripleList zipWithIndex) map {
-      case (triple, index) =>
-        val s = triple.split(",")
-        val (benchmark, toolStr, experimentName) = (s(0), s(1), s(2))
-        val tool = toolStr.toLowerCase match {
-          case "randoop"  => Randoop
-          case "evosuite" => EvoSuite
-          case _          => JDoop // assume JDoop as default
-        }
-        val finalExperimentName =
-          if (experimentName.isEmpty) defaultExperimentName
-          else experimentName
-        val resultsSuffixDir = mkFilePath(
-          finalExperimentName,
-          tool.toString.toLowerCase,
-          timelimit.toString
-        )
-        Task(
-          project = SF110Project(benchmark),
-          containerName =
-            s"$benchmark-${tool.toString.toLowerCase}-" +
-              s"$finalExperimentName-${index.toString}",
-          timelimit = timelimit,
-          hostBenchmarkDir = mkFilePath(sfRoot, benchmark),
-          hostWorkDir = mkFilePath(
-            scratchResultsRoot,
-            resultsSuffixDir,
-            benchmark
-          ),
-          masterNodeDir = new File(mkFilePath(
-            finalResultsRoot,
-            resultsSuffixDir
-          )),
-          tool = tool
-        )
-    }
+    val benchmarks: Seq[Task] = (args drop(1) foldRight (Seq[Task](), 0)) {
+      (arg, acc) =>
+      val (accBenchmarks, offset) = acc
+      val newBenchmarks =
+        unsafeProcessInputArg(arg)(timelimit, defaultExperimentName, offset)
+      (accBenchmarks ++ newBenchmarks, offset + newBenchmarks.length)
+    }._1
+    val benchmarksShuffled = scala.util.Random.shuffle(benchmarks)
 
     val hostWorkDirs = benchmarks.map{ b => new File(b.hostWorkDir) }.toSet
     initResDirs(workerMachines, hostWorkDirs)
     pushCgroupsFile(workerMachines, cpuCoresFilePath)
     val tools = benchmarks map { _.tool } toSet
 
-    Env(benchmarks, tools, hostWorkDirs)
+    Env(benchmarksShuffled, tools, hostWorkDirs)
   }
 
   def main(args: Array[String]): Unit = {
-
     val env = unsafePrepareEnv(args)
     import env._
 
@@ -136,11 +151,10 @@ object Main {
     val r = distBenchmarks.map{RunTask(_)}.reduce{(_, _) => ()}
     sc.stop()
 
-    println("Results are available in: " +
-      hostWorkDirs.map{
-        _.getPath.replaceAll(scratchResultsRoot, finalResultsRoot)
-        .split("/").dropRight(1).mkString("/")
-      }.mkString (" ")
-    )
+    println("Results are available in:")
+    hostWorkDirs.foreach{ d => println("  " +
+      d.getPath.replaceAll(scratchResultsRoot, finalResultsRoot)
+        .split("/").dropRight(1).mkString("/"))
+    }
   }
 }

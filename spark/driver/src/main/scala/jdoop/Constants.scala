@@ -26,7 +26,6 @@ object Constants {
     System.getProperty("java.io.tmpdir"),
     "cpu-cores"
   ).mkString("/")
-  val defaultTimelimit = 30 // seconds
   val totalSparkClusterNodes = 15
   val masterMachine = "node-1.multinode.jpf-doop.emulab.net"
   val workerMachines = (2 to totalSparkClusterNodes) map {
