@@ -163,27 +163,33 @@ abstract class RunTask(task: Task) {
     s"sudo chown -R ${System.getenv("USER")}: ${task.hostWorkDir}".!
 
     // Record the number of test cases
-    val tcCountFile = new File(
-      Main.mkFilePath(task.hostWorkDir, "test-case-count.txt")
-    )
-    tcCountFile.createNewFile()
-    printToFile(tcCountFile){_.println(testCaseCount)}
+    try {
+      val tcCountFile = new File(
+        Main.mkFilePath(task.hostWorkDir, "test-case-count.txt")
+      )
+      tcCountFile.createNewFile()
+      printToFile(tcCountFile){_.println(testCaseCount)}
+    } catch { case _: Throwable => () }
     // ... and finally delete them
-    deleteGenFiles(testDirRegexs)
+    try deleteGenFiles(testDirRegexs) catch { case _: Throwable => () }
 
     // archive JaCoCo html files
-    val jacocoDir = Some(new File(
-      Main.mkFilePath(task.hostWorkDir, "jacoco-site")))
-    if (jacocoDir.get.exists) {
-      Process(Seq("tar", "czf", "html.tar.gz", "html"), jacocoDir).!
-      Process(Seq("rm", "-rf", "html"), jacocoDir).!
-    }
+    try {
+      val jacocoDir = Some(new File(
+        Main.mkFilePath(task.hostWorkDir, "jacoco-site")))
+      if (jacocoDir.get.exists) {
+        Process(Seq("tar", "czf", "html.tar.gz", "html"), jacocoDir).!
+        Process(Seq("rm", "-rf", "html"), jacocoDir).!
+      }
+    } catch { case _: Throwable => () }
 
     // record the total time spent on this task and write it to a file
-    val totalTime = (System.nanoTime() - startTime) / 1000000000 // seconds
-    val totalTimeFile = new File(totalTimeFilePath)
-    totalTimeFile.createNewFile()
-    printToFile(totalTimeFile){_.println(totalTime)}
+    try {
+      val totalTime = (System.nanoTime() - startTime) / 1000000000 // seconds
+      val totalTimeFile = new File(totalTimeFilePath)
+      totalTimeFile.createNewFile()
+      printToFile(totalTimeFile){_.println(totalTime)}
+    } catch { case _: Throwable => () }
 
     // sync everything to the master node
     Process(Seq(
