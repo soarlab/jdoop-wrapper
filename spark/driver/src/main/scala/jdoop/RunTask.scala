@@ -144,6 +144,10 @@ abstract class RunTask(task: Task) {
     val startTime = System.nanoTime()
     System.err.println(s"Starting task ${task.project.projectDir}")
 
+    // Remove any left-overs in case this is a re-attempt of the task
+    s"sudo lxc-destroy --force --name ${task.containerName}".!
+    s"sudo rm -rf ${task.hostWorkDir}".!
+
     s"mkdir -p ${task.hostWorkDir}".!
     val toolCmd = List(
       "su", "--login", "-c",
@@ -155,10 +159,9 @@ abstract class RunTask(task: Task) {
       _ <- startContainer(containerCores)
       _ <- in_containerSeq(toolCmd)
     } yield ()
-    // Stop the container (this will also destroy it because it is
-    // ephemeral). We are running this outside the for comprehension
-    // to make sure the container is destroyed.
-    s"sudo lxc-stop --name ${task.containerName}".!
+    // Stop and destroy the container. We are running this outside the
+    // for comprehension to make sure the container is destroyed.
+    s"sudo lxc-destroy --force --name ${task.containerName}".!
     ReleaseContainerCores(containerCores)
     s"sudo chown -R ${System.getenv("USER")}: ${task.hostWorkDir}".!
 
@@ -195,6 +198,7 @@ abstract class RunTask(task: Task) {
     Process(Seq(
       "rsync",
       "-a",
+      "--delete", // for the case this is a re-attempt of the task
       task.hostWorkDir,
       s"$masterMachine:${task.masterNodeDir.getPath}"
     )).!
