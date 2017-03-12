@@ -300,12 +300,23 @@ object RunTask {
     lazy val options = Seq(
       "-continuous", "execute",
       s"-Dctg_cores=$coresPerContainer",
-      s"-Dctg_memory=" + ((memoryPerContainer >> 20) /
-        coresPerContainer).toString,                   // in MB per core
+      "-Dctg_memory=" + ((memoryPerContainer >> 20) / coresPerContainer)
+        .toString,                                     // in MB per core
       s"-Dctg_time=${task.timelimit / 60}",            // in minutes
-      s"-Dctg_export_folder=tests",
-      s"-Dctg_schedule=budget_and_seeding"
-    )
+      "-Dctg_export_folder=tests",
+      "-Dctg_schedule=budget_and_seeding",
+      "-target",
+      Main.mkFilePath(
+        benchmarkDir,
+        relativeBinDir,
+        task.project.projectDir.split("_")(1) + ".jar"
+      ),
+      "-Duse_separate_classloader=false"
+    ) ++
+      (if (dependencyLibs != "")
+        Seq("-projectCP", dependencyLibs)
+      else Seq()
+      )
 
     // TODO: Change this to a meaningful value
     val testDirRegexs = Set[Regex]()
