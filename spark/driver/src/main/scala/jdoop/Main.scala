@@ -126,14 +126,14 @@ object Main {
       accBenchmarks ++
         unsafeProcessInputArg(arg)(timelimit, defaultExperimentName)
     }
-    val benchmarksShuffled = scala.util.Random.shuffle(benchmarks)
+    val benchmarksSorted = benchmarks.sorted
 
     val hostWorkDirs = benchmarks.map{ b => new File(b.hostWorkDir) }.toSet
     initResDirs(workerMachines, hostWorkDirs)
     pushCgroupsFile(workerMachines, cpuCoresFilePath)
     val tools = benchmarks map { _.tool } toSet
 
-    Env(benchmarksShuffled, tools, hostWorkDirs)
+    Env(benchmarksSorted, tools, hostWorkDirs)
   }
 
   def main(args: Array[String]): Unit = {
