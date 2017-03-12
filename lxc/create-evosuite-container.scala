@@ -26,17 +26,21 @@ object EvoSuiteContainer {
     sudo
     ant
     ant-optional
+    git
     openjdk-8-jre
     openjdk-8-jre-headless
     openjdk-8-jdk
+    python
     wget
+    unzip
 """.split("\n").map{_.trim}.filter{!_.isEmpty}
 
-  val lxc_user = "debian"
+  val lxcUser = "debian"
+  val lxcHome = s"/home/$lxcUser"
+  val jdoopDir = s"$lxcHome/jdoop"
+  val jdoopRepo = "https://github.com/psycopaths/jdoop"
   val evoSuiteArchiveURL = "https://github.com/EvoSuite/evosuite/releases/" +
-    "download/v1.0.3/evosuite-1.0.3.jar"
-  val jaCoCoArchiveURL = "https://github.com/jacoco/jacoco/releases/" +
-    "download/v0.7.5/jacoco-0.7.5.201505241946.zip"
+    "download/1.0.4/evosuite-1.0.4.jar"
 
   // converts an Int into an Option around Unit representing a process
   // success or failure
@@ -83,19 +87,18 @@ object EvoSuiteContainer {
       _ <- in_container(List("su", "-c",
         "echo '%sudo ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers"))
       _ <- in_container("useradd --create-home --groups sudo --shell " +
-        s"/bin/bash $lxc_user")
+        s"/bin/bash $lxcUser")
+      _ <- in_container(List("su", "--login", "-c", "mkdir evosuite", lxcUser))
       _ <- in_container(List(
         "su", "--login", "-c",
-        s"wget $evoSuiteArchiveURL",
-        lxc_user))
-      _ <- in_container(List(
-        "su", "--login", "-c",
-        s"wget $jaCoCoArchiveURL -O jacoco.jar",
-        lxc_user))
+        s"wget $evoSuiteArchiveURL -O evosuite/evosuite.jar",
+        lxcUser))
+      // JDoop is brought in so we can easily run JaCoCo code coverage
+      // reports for EvoSuite-generated test suites
+      _ <- in_container(List("su", "--login", "-c", s"git clone $jdoopRepo",
+        lxcUser))
       _ <- in_container(s"mkdir $benchmarkDir")
       _ <-  s"sudo lxc-stop --name $destination".!
-      // install JaCoCo 0.7.5 too and run it once EvoSuite is over
-      // (the later part comes in the Spark runner for EvoSuite)
     } yield ()
   }
 }
