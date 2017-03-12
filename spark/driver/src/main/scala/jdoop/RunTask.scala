@@ -164,6 +164,7 @@ abstract class RunTask(task: Task) {
     s"sudo lxc-destroy --force --name ${task.containerName}".!
     ReleaseContainerCores(containerCores)
     s"sudo chown -R ${System.getenv("USER")}: ${task.hostWorkDir}".!
+    s"sudo chmod -R u+rwx ${task.hostWorkDir}".!
 
     // Record the number of test cases
     try {
