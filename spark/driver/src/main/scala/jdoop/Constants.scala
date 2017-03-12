@@ -26,7 +26,7 @@ object Constants {
     System.getProperty("java.io.tmpdir"),
     "cpu-cores"
   ).mkString("/")
-  val totalSparkClusterNodes = 15
+  val totalSparkClusterNodes = 20
   val masterMachine = "node-1.multinode.jpf-doop.emulab.net"
   val workerMachines = (2 to totalSparkClusterNodes) map {
     i => s"node-$i.multinode.jpf-doop.emulab.net"
