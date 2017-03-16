@@ -12,7 +12,6 @@
 14_omjstate
 15_beanbin
 16_templatedetails
-18_jsecurity
 19_jmca
 21_geo-google
 22_byuic
@@ -25,12 +24,9 @@
 31_xisemele
 33_javaviewcontrol
 34_sbmlreader2
-36_schemaspy
 37_petsoar
-38_javabullboard
 39_diffi
 40_glengineer
-41_follow
 42_asphodel
 45_lotus
 46_nutzenportfolio
@@ -67,7 +63,6 @@
 89_jiggler
 90_dcparseargs
 91_classviewer
-93_quickserver
 94_jclo
 95_celwars2009
 98_trans-locator
