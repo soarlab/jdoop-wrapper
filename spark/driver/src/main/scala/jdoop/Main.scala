@@ -144,7 +144,7 @@ object Main {
     val sc = new SparkContext(conf)
 
     val distBenchmarks = sc.parallelize(benchmarks, benchmarks.length)
-    val r = distBenchmarks.map{RunTask(_)}.reduce{(_, _) => ()}
+    distBenchmarks.map{RunTask(_)}.reduce{(_, _) => ()}
     sc.stop()
 
     println("Results are available in:")
