@@ -34,7 +34,6 @@
 58_fps370
 59_mygrid
 60_sugar
-61_noen
 62_dom4j
 63_objectexplorer
 65_gsftp
@@ -53,6 +52,5 @@
 94_jclo
 95_celwars2009
 98_trans-locator
-101_netweaver
 102_squirrel-sql
 103_sweethome3d
