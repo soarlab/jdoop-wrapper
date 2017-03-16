@@ -4,14 +4,17 @@
 5_templateit
 6_jnfe
 7_sfmis
+9_falselight
 10_water-simulator
 11_imsmart
+12_dsachat
 13_jdbacl
 14_omjstate
 15_beanbin
 16_templatedetails
 18_jsecurity
 19_jmca
+21_geo-google
 22_byuic
 23_jwbf
 26_jipa
@@ -51,6 +54,7 @@
 69_lhamacaw
 70_echodep
 71_ext4j
+72_battlecry
 73_fim1
 74_fixsuite
 76_dash-framework
@@ -69,6 +73,7 @@
 98_trans-locator
 99_newzgrabber
 100_jgaap
+101_netweaver
 102_squirrel-sql
 103_sweethome3d
 105_freemind
