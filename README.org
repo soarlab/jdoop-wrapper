@@ -84,9 +84,9 @@ directory:
 
 * Emulab
 
-In developing this infrastructure and evaluating the testing tool, we
-have been using [[print-total-times-sorted.scala][Emulab]], a network testbed developed and provided by
-the [[print-total-times-sorted.scala][Flux Research Group]] at the University of Utah.
+In developing this infrastructure and evaluating the testing tools, we
+have been using [[http://emulab.net/][Emulab]], a network testbed developed and provided by
+the [[https://www.flux.utah.edu/][Flux Research Group]] at the University of Utah.
 
 * Copyright
 Copyright 2017 Marko Dimjašević
