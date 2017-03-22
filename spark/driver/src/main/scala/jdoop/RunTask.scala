@@ -72,7 +72,7 @@ abstract class RunTask(task: Task) {
     *  @param r A regular expression matching names of files to be returned
     *  @return A stream of files found by the search
     */
-  private def recursiveListFiles(f: File, r: Regex): Stream[File] = {
+  protected def recursiveListFiles(f: File, r: Regex): Stream[File] = {
     require(f.isDirectory())
 
     val currentDirFiles = f.listFiles.toStream
@@ -224,8 +224,8 @@ abstract class RunTask(task: Task) {
     val wd = new File(task.hostWorkDir)
     dirs foreach { regex =>
       recursiveListFiles(wd, regex) foreach { dir =>
-        allJavaFiles(dir) foreach { _.delete }
-        allClassFiles(dir) foreach { _.delete }
+        allJavaFiles(dir) foreach { _.delete() }
+        allClassFiles(dir) foreach { _.delete() }
       }
     }
   }
