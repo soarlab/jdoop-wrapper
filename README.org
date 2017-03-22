@@ -1,0 +1,111 @@
+* About
+
+This is an infrastructure for comparison of [[https://github.com/psycopaths/jdoop][JDoop]] against other Java
+test case generation tools, namely [[https://randoop.github.io/randoop/][Randoop]] (and currently working on
+supporting EvoSuite too) on the [[http://www.evosuite.org/subjects/sf110/][SF110 suite]] of software from the
+SourceForge repository.
+
+The infrastructure facilitates reproducible research as the testing
+tools run in pristine Linux containers that can be rebuilt from
+scratch, always with exactly the same versions of all software
+dependencies. Furthermore, all containers get dedicated CPU cores and
+a certain amount of memory.
+
+*jdoop-wrapper* is built around [[https://spark.apache.org/][Apache Spark]], a cluster computation
+framework.
+
+* Configuration
+
+There are a few constants to tweak before you start using
+*jdoop-wrapper*:
+
++ In =spark/conf/slaves= replace machine names with those that you
+  will be using in your cluster. They will all have to follow a name
+  pattern. Also see
+  =spark/driver/src/main/scala/jdoop/Constants.scala=.
++ The number of tools/benchmarks that can run in parallel on a
+  slave/worker node is specified in =spark/conf/spark-env-slave.sh=.
++ The number of CPU cores and memory per Linux container is given in
+  =spark/driver/src/main/scala/jdoop/Constants.scala=.
++ For the directories where results are stored, also change
+  =spark/driver/src/main/scala/jdoop/Constants.scala= accordingly.
++ To configure which of the testing tools to use, on what benchmarks,
+  and how many different runs there should be to accommodate for
+  randomness, change the last part of =spark/start-spark-app.sh=.
+
+* Usage
+
+The main part of the infrastructure is a Spark application. To prepare
+all cluster nodes with needed software and configuration, run:
+
+#+BEGIN_SRC bash
+  ./spark/prepare-all.sh
+#+END_SRC
+
+This was tested on Ubuntu 16.04.1 LTS as the host machine. Linux
+containers run a testing version of GNU/Linux Debian Stretch.
+
+The application can be started with:
+
+#+BEGIN_SRC bash
+  ./spark/start-spark-app.sh
+#+END_SRC
+
+You may want to run both of this tools in something like GNU Screen
+for convenience.
+
+** Analyzing results
+
+To analyze results once the Spark application finishes with its
+execution, you can use several scripts available in the =stats=
+directory:
+
++ The main tool that aggregates all statistics - branch and
+  instruction coverage, cyclomatic complexity, and the number of
+  generated test cases - is =stats.scala=. For example, if your want
+  to see results for JDoop and they are in
+  =/mnt/storage/sf110-results/jdoop-ten-runs=, where you had 5 runs
+  for each benchmark for an hour, change to that directory and run:
+  #+BEGIN_SRC bash
+    /path/to/jdoop-wrapper/spark/stats/stats.scala 0/3600 1/3600 2/3600 3/3600 4/3600
+  #+END_SRC
++ To find benchmarks and runs that failed, use
+  =find-failed-benchmarks.scala=:
+  #+BEGIN_SRC bash
+    /path/to/jdoop-wrapper/spark/stats/find-failed-benchmarks.scala 0/3600 1/3600 2/3600 3/3600 4/3600
+  #+END_SRC
++ If you are interested in how much each benchmark for each tool took
+  (because other than generating test cases in e.g. an hour, the
+  infrastructure also compiles the test cases and runs them to measure
+  code coverage), run:
+  #+BEGIN_SRC bash
+    /path/to/jdoop-wrapper/spark/stats/print-total-times-sorted.scala .
+  #+END_SRC
+
+* Emulab
+
+In developing this infrastructure and evaluating the testing tool, we
+have been using [[print-total-times-sorted.scala][Emulab]], a network testbed developed and provided by
+the [[print-total-times-sorted.scala][Flux Research Group]] at the University of Utah.
+
+* Copyright
+Copyright 2017 Marko Dimjašević
+
+This file is part of jdoop-wrapper.
+
+jdoop-wrapper is free software: you can redistribute it and/or modify it
+under the terms of the GNU Affero General Public License as
+published by the Free Software Foundation, either version 3 of the
+License, or (at your option) any later version.
+
+jdoop-wrapper is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with maline.  If not, see <http://www.gnu.org/licenses/>.
+
+
+Dependencies for jdoop-wrapper, i.e. Apache Spark and the testing
+tools, are free software. See their licenses for details.
