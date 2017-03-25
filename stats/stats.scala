@@ -117,6 +117,15 @@ object Stats {
       "cxty", "=", cyclomaticCxty + ",",
       "# tests", "=", testCaseCount.toStringSub
     ).mkString(" ")
+
+    def toCSV: String = Seq(
+      proj.projectDir,
+      branchCov,
+      instructionCov,
+      cyclomaticCxty,
+      testCaseCount.toStringSub,
+      timelimit.toString
+    ).mkString("\t")
   }
 
   def processStats(stats: Seq[BenchmarkStats]): Map[Time, Set[BenchmarkStats]] = {
@@ -282,7 +291,9 @@ object Stats {
 
   def main(args: Array[String]): Unit = {
     if (args.length == 0) usage()
-    val dirs = args.toSeq
+
+    val csv = args(0) == "--csv"
+    val dirs = args.drop(if (csv) 1 else 0).toSeq
     try {
       dirs map { _.split("/").last.toInt }
       dirs foreach { d => if (!(new File(d).isDirectory)) usage() }
@@ -290,13 +301,19 @@ object Stats {
     catch { case _: Throwable => usage() }
 
     val stats = run(dirs)
-    stats foreach { case (t, set) =>
-      println(s"Timelimit: $t")
-      println("Results:")
-      set
-        .toSeq
-        .sortBy(b => b.proj.projectDir.split("_")(0).toInt)
-        .foreach{println}
+
+    if (!csv) {
+      stats foreach { case (t, set) =>
+        println(s"Timelimit: $t")
+        println("Results:")
+        set.toSeq.sorted.foreach{println}
+      }
+    } else {
+      // Print the header first
+      println("benchmark\tbranch\tinstruction\tcyclomatic\ttests\ttimelimit")
+      stats foreach { case (_, set) =>
+        set.toSeq.sorted.foreach{b => println(b.toCSV)}
+      }
     }
   }
 }
