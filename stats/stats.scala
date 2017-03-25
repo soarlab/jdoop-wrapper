@@ -92,7 +92,7 @@ object Stats {
     cyclomaticCxty: CovMetric,
     testCaseCount: CovMetric,
     timelimit: Time
-  ) {
+  ) extends Ordered[BenchmarkStats] {
     def +(that: BenchmarkStats): BenchmarkStats = {
       require(proj == that.proj && timelimit == that.timelimit)
 
@@ -105,6 +105,10 @@ object Stats {
         timelimit
       )
     }
+
+    def compare(that: BenchmarkStats): Int =
+      this.proj.projectDir.split("_")(0).toInt -
+        that.proj.projectDir.split("_")(0).toInt
 
     override def toString: String = Seq(
       proj.projectDir + ":",
