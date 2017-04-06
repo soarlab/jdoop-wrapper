@@ -260,6 +260,8 @@ object RunTask {
       "--root",
       Main.mkFilePath(benchmarkDir, relativeSrcDir),
       "--timelimit", task.timelimit.toString,
+      "--randoop-time", "60",
+      "--jdart-time", "540",
       "--jpf-core-path", s"$jDoopDependencyDir/jpf-core",
       "--jdart-path", s"$jDoopDependencyDir/jdart",
       "--sut-compilation",
