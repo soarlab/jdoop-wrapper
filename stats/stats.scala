@@ -41,12 +41,28 @@ object Stats {
   case object TestCaseCount extends CovType {
     override def toString = "TCCOUNT"
   }
+  // The method and class coverage types are used only to obtain the
+  // total number of methods and classes in a benchmark
+  case object MethodCov extends CovType {
+    override def toString = "METHOD"
+  }
+  case object ClassCov extends CovType {
+    override def toString = "CLASS"
+  }
 
-  val allCovTypes = Set[CovType](
+  val allMeasuredCovTypes = Set[CovType](
     InstructionCov,
     BranchCov,
     CyclomaticComplexity,
     TestCaseCount
+  )
+
+  val overviewCovTypes = Set[CovType](
+    InstructionCov,
+    BranchCov,
+    MethodCov,
+    ClassCov,
+    CyclomaticComplexity
   )
 
   case class CovMetric(covered: Seq[Int], total: Int) {
@@ -83,6 +99,15 @@ object Stats {
       new CovMetric(Seq(covered), total)
   }
 
+  def compareSF110Projects(a: SF110Project, b: SF110Project): Int = {
+    val intPrefix: SF110Project => Int = _.projectDir.split("_")(0).toInt
+    val aPref = intPrefix(a)
+    val bPref = intPrefix(b)
+    if (aPref < bPref)      -1
+    else if (aPref > bPref)  1
+    else                     0
+  }
+
   type Time = Int
 
   case class BenchmarkStats(
@@ -107,8 +132,7 @@ object Stats {
     }
 
     def compare(that: BenchmarkStats): Int =
-      this.proj.projectDir.split("_")(0).toInt -
-        that.proj.projectDir.split("_")(0).toInt
+      compareSF110Projects(this.proj, that.proj)
 
     override def toString: String = Seq(
       proj.projectDir + ":",
@@ -125,6 +149,37 @@ object Stats {
       cyclomaticCxty,
       testCaseCount.toStringSub,
       timelimit.toString
+    ).mkString("\t")
+  }
+
+  case class BenchmarkInfo(
+    proj:           SF110Project,
+    branchCov:      CovMetric,
+    instructionCov: CovMetric,
+    methodCov:      CovMetric,
+    classCov:       CovMetric,
+    cyclomaticCxty: CovMetric
+  ) extends Ordered[BenchmarkInfo] {
+    def compare(that: BenchmarkInfo): Int =
+      compareSF110Projects(this.proj, that.proj)
+
+    override def toString: String = Seq(
+      proj.projectDir + ":",
+      "brnch", "=", branchCov.total + ",",
+      "instr", "=", instructionCov.total + ",",
+      "mthd",  "=", methodCov.total + ",",
+      "class", "=", classCov.total + ",",
+      "cxty",  "=", cyclomaticCxty.total.toString
+    ).mkString(" ")
+
+    def toCSV: String = (proj.projectDir +:
+      Seq(
+        branchCov,
+        instructionCov,
+        methodCov,
+        classCov,
+        cyclomaticCxty
+      ).map{_.total.toString}
     ).mkString("\t")
   }
 
@@ -249,7 +304,8 @@ object Stats {
   def extProjDir(f: File): String = extfromPathEnd(f, 2)
   def extTimelimit(f: File): Time = extfromPathEnd(f, 3).toInt
 
-  def reportMap: Seq[String] => Map[File, Set[CovType]] = dirs =>
+  def reportMap(dirs: Seq[String], covTypes: Set[CovType]):
+      Map[File, Set[CovType]] =
     (for {
       dir <- dirs
       bm  <- benchmarksInDir(new File(dir))
@@ -258,7 +314,7 @@ object Stats {
         Seq(dir, bm.projectDir, "jacoco-site", "report.xml")
           .mkString("/")
       ),
-      allCovTypes
+      covTypes
     ))
     ).toMap
 
@@ -286,33 +342,73 @@ object Stats {
       }
     }
 
-  def run: Seq[String] => Map[Time, Set[BenchmarkStats]] =
-    reportMap andThen covForFiles andThen statsList andThen processStats
+  def run: Seq[String] => Map[Time, Set[BenchmarkStats]] = dirs => {
+    val rMap = reportMap(dirs, allMeasuredCovTypes)
+    val covForFilesMap = covForFiles(rMap)
+    val bmStatsList = statsList(covForFilesMap)
+    processStats(bmStatsList)
+  }
+
+  def getBenchmarkInfo: Seq[String] => Set[BenchmarkInfo] = dirs => {
+    def zeroedCovMetric(map: Map[CovType, CovMetric], ct: CovType): CovMetric =
+      map.getOrElse(ct, CovMetric(0, 0)).copy(covered = Seq(0))
+
+    val rMap = reportMap(dirs, overviewCovTypes)
+    val covForFilesMap: Map[File, Option[Map[CovType, CovMetric]]] =
+      covForFiles(rMap)
+    covForFilesMap.foldRight(Set.empty[BenchmarkInfo]){(kv, accSet) =>
+      val (f, oCovMap) = kv
+      accSet ++ (oCovMap match {
+        case Some(covMap) =>
+          Set(BenchmarkInfo(
+            proj           = SF110Project(extProjDir(f)),
+            branchCov      = zeroedCovMetric(covMap, BranchCov),
+            instructionCov = zeroedCovMetric(covMap, InstructionCov),
+            methodCov      = zeroedCovMetric(covMap, MethodCov),
+            classCov       = zeroedCovMetric(covMap, ClassCov),
+            cyclomaticCxty = zeroedCovMetric(covMap, CyclomaticComplexity)
+          ))
+        case None => Set()
+      })
+    }
+  }
 
   def main(args: Array[String]): Unit = {
+    val flags = Map("csv" -> "--csv", "total" -> "--total")
     if (args.length == 0) usage()
 
-    val csv = args(0) == "--csv"
-    val dirs = args.drop(if (csv) 1 else 0).toSeq
+    val csvFlag   = args(0) == flags("csv")
+    val totalFlag = args(0) == flags("total")
+    val dirs      = args
+      .drop(if (flags.values.toSeq.contains(args(0))) 1 else 0)
+      .toSeq
     try {
       dirs map { _.split("/").last.toInt }
       dirs foreach { d => if (!(new File(d).isDirectory)) usage() }
     }
     catch { case _: Throwable => usage() }
 
-    val stats = run(dirs)
-
-    if (!csv) {
-      stats foreach { case (t, set) =>
-        println(s"Timelimit: $t")
-        println("Results:")
-        set.toSeq.sorted.foreach{println}
-      }
-    } else {
+    if (totalFlag) {
+      val bmInfoStats = getBenchmarkInfo(dirs)
       // Print the header first
-      println("benchmark\tbranch\tinstruction\tcyclomatic\ttests\ttimelimit")
-      stats foreach { case (_, set) =>
-        set.toSeq.sorted.foreach{b => println(b.toCSV)}
+      println("benchmark\tbranches\tinstructions\tmethods\tclasses\tcyclomatic")
+      bmInfoStats.toSeq.sorted.foreach{b => println(b.toCSV)}
+    }
+    else {
+      val stats = run(dirs)
+
+      if (!csvFlag) {
+        stats foreach { case (t, set) =>
+          println(s"Timelimit: $t")
+          println("Results:")
+          set.toSeq.sorted.foreach{println}
+        }
+      } else {
+        // Print the header first
+        println("benchmark\tbranch\tinstruction\tcyclomatic\ttests\ttimelimit")
+        stats foreach { case (_, set) =>
+          set.toSeq.sorted.foreach{b => println(b.toCSV)}
+        }
       }
     }
   }
