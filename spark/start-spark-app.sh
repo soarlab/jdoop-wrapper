@@ -36,6 +36,7 @@ ${WRAPPER_HOME}/lxc/stop-containers.scala
 
 cd -
 ${WRAPPER_HOME}/spark/stop-all.sh || true
+${WRAPPER_HOME}/spark/cleanup-work-dirs.scala
 ${WRAPPER_HOME}/spark/start-spark-all.sh
 
 echo "Starting the Spark application..."
