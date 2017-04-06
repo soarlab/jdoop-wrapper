@@ -150,6 +150,15 @@ object Stats {
       testCaseCount.toStringSub,
       timelimit.toString
     ).mkString("\t")
+
+    def toCSVsub: String = Seq(
+      proj.projectDir,
+      branchCov.toStringSub,
+      instructionCov.toStringSub,
+      cyclomaticCxty.toStringSub,
+      testCaseCount.toStringSub,
+      timelimit.toString
+    ).mkString("\t")
   }
 
   case class BenchmarkInfo(
@@ -374,12 +383,17 @@ object Stats {
   }
 
   def main(args: Array[String]): Unit = {
-    val flags = Map("csv" -> "--csv", "total" -> "--total")
+    val flags = Map(
+      "csv"    -> "--csv",
+      "csvSub" -> "--csvsub",
+      "total"  -> "--total"
+    )
     if (args.length == 0) usage()
 
-    val csvFlag   = args(0) == flags("csv")
-    val totalFlag = args(0) == flags("total")
-    val dirs      = args
+    val csvFlag    = args(0) == flags("csv")
+    val csvSubFlag = args(0) == flags("csvSub")
+    val totalFlag  = args(0) == flags("total")
+    val dirs       = args
       .drop(if (flags.values.toSeq.contains(args(0))) 1 else 0)
       .toSeq
     try {
@@ -397,7 +411,7 @@ object Stats {
     else {
       val stats = run(dirs)
 
-      if (!csvFlag) {
+      if (!csvFlag && !csvSubFlag) {
         stats foreach { case (t, set) =>
           println(s"Timelimit: $t")
           println("Results:")
@@ -406,8 +420,11 @@ object Stats {
       } else {
         // Print the header first
         println("benchmark\tbranch\tinstruction\tcyclomatic\ttests\ttimelimit")
+        val statsToString: BenchmarkStats => String =
+          if (csvFlag) _.toCSV
+          else         _.toCSVsub
         stats foreach { case (_, set) =>
-          set.toSeq.sorted.foreach{b => println(b.toCSV)}
+          set.toSeq.sorted.foreach{b => println(statsToString(b))}
         }
       }
     }
