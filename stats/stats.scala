@@ -86,11 +86,13 @@ object Stats {
       "%.1f".format(stdDev)
     ) mkString(" ")
 
+    def toPercentage: String = "(" + "%2.1f".format(percentageAvg) + "%)"
+
     override def toString: String = Seq(
       toStringSub,
       "/",
       total,
-      "(" + "%2.1f".format(percentageAvg) + "%)"
+      toPercentage
     ) mkString(" ")
   }
 
