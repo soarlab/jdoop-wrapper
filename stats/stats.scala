@@ -153,14 +153,21 @@ object Stats {
       timelimit.toString
     ).mkString("\t")
 
-    def toCSVsub: String = Seq(
-      proj.projectDir,
-      branchCov.toStringSub,
-      instructionCov.toStringSub,
-      cyclomaticCxty.toStringSub,
-      testCaseCount.toStringSub,
-      timelimit.toString
-    ).mkString("\t")
+    def toCSVsub: String = {
+      def metricToSubString(cm: CovMetric): String =
+        cm.toStringSub + " " + cm.toPercentage
+
+      val cmSeq = Seq(
+        branchCov,
+        instructionCov,
+        cyclomaticCxty
+      ) map metricToSubString
+
+      (Seq(proj.projectDir) ++
+        cmSeq ++
+        Seq(testCaseCount.toStringSub, timelimit.toString)
+      ) mkString("\t")
+    }
   }
 
   case class BenchmarkInfo(
