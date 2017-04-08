@@ -51,7 +51,7 @@ The application can be started with:
   ./spark/start-spark-app.sh
 #+END_SRC
 
-You may want to run both of this tools in something like GNU Screen
+You may want to run both of these tools in something like GNU Screen
 for convenience.
 
 ** Analyzing results
