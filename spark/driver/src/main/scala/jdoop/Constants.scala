@@ -15,7 +15,7 @@ package jdoop
 // GNU Affero General Public License for more details.
 //
 // You should have received a copy of the GNU Affero General Public License
-// along with maline.  If not, see <http://www.gnu.org/licenses/>.
+// along with jdoop-wrapper.  If not, see <http://www.gnu.org/licenses/>.
 
 
 object Constants {

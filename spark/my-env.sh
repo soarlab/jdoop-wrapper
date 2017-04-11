@@ -15,7 +15,7 @@
 # GNU Affero General Public License for more details.
 #
 # You should have received a copy of the GNU Affero General Public License
-# along with maline.  If not, see <http://www.gnu.org/licenses/>.
+# along with jdoop-wrapper.  If not, see <http://www.gnu.org/licenses/>.
 
 
 SPARK_MASTER_HOST=${SPARK_MASTER_HOST:-node-1.multinode.jpf-doop.emulab.net}
