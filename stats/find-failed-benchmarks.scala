@@ -34,10 +34,17 @@ object Main {
 
   def findMissing(dir: File): Set[String] = {
     val allBenchmarks = s"ls -1 ${dir.getPath}".!!
-      .split("\n").toSet[String].map{_.trim}.filter{!_.isEmpty}
+      .split("\n")
+      .toSet[String]
+      .map{_.trim}
+      .filter{!_.isEmpty}
       .filter{isBenchmarkDir}
+
     val successfulBenchmarks = s"find ${dir.getPath} -name $jacocoDir".!!
-      .split("\n").toSet[String].map{_.trim}.filter{!_.isEmpty}
+      .split("\n")
+      .toSet[String]
+      .map{_.trim}
+      .filter{!_.isEmpty}
       .map{_.split("/").dropRight(1).last}
       .filter{isBenchmarkDir}
 
