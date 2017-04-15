@@ -19,6 +19,5 @@ package jdoop
 
 
 sealed trait Tool
-case object JDoop    extends Tool
-case object Randoop  extends Tool
-case object EvoSuite extends Tool
+case object JDoop   extends Tool
+case object Randoop extends Tool

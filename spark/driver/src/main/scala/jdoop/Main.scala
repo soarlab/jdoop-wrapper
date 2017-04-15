@@ -54,7 +54,7 @@ object Main {
 
   def usage(): Unit = {
     println("At least two arguments needed: <timelimit> <task-list...>")
-    println("  task-list = <jdoop|randoop|evosuite>,<experiment-name>," +
+    println("  task-list = <jdoop|randoop>,<experiment-name>," +
       "<repetitions>,<input-list>")
     sys.exit(1)
   }
@@ -67,7 +67,6 @@ object Main {
     val (toolStr, experimentName, repStr, inputFile) = (s(0), s(1), s(2), s(3))
     val tool = toolStr.toLowerCase match {
       case "randoop"  => Randoop
-      case "evosuite" => EvoSuite
       case _          => JDoop // assume JDoop as default
     }
     val finalExperimentName =
