@@ -32,7 +32,6 @@
 53_shp2kml
 55_lavalamp
 58_fps370
-59_mygrid
 60_sugar
 62_dom4j
 63_objectexplorer
@@ -53,4 +52,3 @@
 95_celwars2009
 98_trans-locator
 102_squirrel-sql
-103_sweethome3d
