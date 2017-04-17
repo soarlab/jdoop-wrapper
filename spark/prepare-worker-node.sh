@@ -38,7 +38,6 @@ sudo chown $USER: /mnt/scratch
 $WRAPPER_HOME/lxc/change-lxcpath.sh
 $WRAPPER_HOME/lxc/create-debian-container.scala
 $WRAPPER_HOME/lxc/create-jdoop-container.scala stretch jdoop
-$WRAPPER_HOME/lxc/create-evosuite-container.scala stretch evosuite
 $WRAPPER_HOME/spark/install-spark.sh
 ${WRAPPER_HOME}/spark/install-sbt.scala
 $WRAPPER_HOME/cpu/disable-hyperthreading.sh || true
