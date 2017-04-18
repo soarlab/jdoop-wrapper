@@ -18,6 +18,9 @@ package jdoop
 // along with jdoop-wrapper.  If not, see <http://www.gnu.org/licenses/>.
 
 
+import scala.language.postfixOps
+
+
 object Constants {
   val totalCpuCores = 16
   val coresPerContainer = 4

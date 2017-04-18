@@ -22,6 +22,8 @@ import Constants._
 import CPUCoresUtil._
 import GetContainerCores.CoreSet
 import java.io.{File, PrintWriter}
+import scala.language.implicitConversions
+import scala.language.postfixOps
 import scala.util.matching.Regex
 import sys.process._
 

@@ -22,6 +22,7 @@ import Constants._
 import java.io.File
 import org.apache.spark.{SparkConf, SparkContext}
 import org.apache.spark.rdd.RDD
+import scala.language.postfixOps
 import sys.process._
 
 
