@@ -23,6 +23,7 @@ import javax.xml.parsers.SAXParser
 import scala.xml.{Elem, Node, NodeSeq}
 import scala.xml.factory.XMLLoader
 
+
 object Stats {
 
   case class SF110Project(projectDir: String)
@@ -37,6 +38,9 @@ object Stats {
   }
   case object CyclomaticComplexity extends CovType {
     override def toString = "COMPLEXITY"
+  }
+  case object FailedTestCaseCount extends CovType {
+    override def toString = "FTCCOUNT"
   }
   case object TestCaseCount extends CovType {
     override def toString = "TCCOUNT"
@@ -54,6 +58,7 @@ object Stats {
     InstructionCov,
     BranchCov,
     CyclomaticComplexity,
+    FailedTestCaseCount,
     TestCaseCount
   )
 
@@ -113,12 +118,13 @@ object Stats {
   type Time = Int
 
   case class BenchmarkStats(
-    proj: SF110Project,
-    branchCov: CovMetric,
-    instructionCov: CovMetric,
-    cyclomaticCxty: CovMetric,
-    testCaseCount: CovMetric,
-    timelimit: Time
+    proj:                SF110Project,
+    branchCov:           CovMetric,
+    instructionCov:      CovMetric,
+    cyclomaticCxty:      CovMetric,
+    failedTestCaseCount: CovMetric,
+    testCaseCount:       CovMetric,
+    timelimit:           Time
   ) extends Ordered[BenchmarkStats] {
     def +(that: BenchmarkStats): BenchmarkStats = {
       require(proj == that.proj && timelimit == that.timelimit)
@@ -128,6 +134,7 @@ object Stats {
         branchCov + that.branchCov,
         instructionCov + that.instructionCov,
         cyclomaticCxty + that.cyclomaticCxty,
+        failedTestCaseCount + that.failedTestCaseCount,
         testCaseCount + that.testCaseCount,
         timelimit
       )
@@ -138,10 +145,11 @@ object Stats {
 
     override def toString: String = Seq(
       proj.projectDir + ":",
-      "brnch", "=", branchCov + ",",
-      "instr", "=", instructionCov + ",",
-      "cxty", "=", cyclomaticCxty + ",",
-      "# tests", "=", testCaseCount.toStringSub
+      "brnch",     "=", branchCov + ",",
+      "instr",     "=", instructionCov + ",",
+      "cxty",      "=", cyclomaticCxty + ",",
+      "# f tests", "=", failedTestCaseCount.toStringSub,
+      "# tests",   "=", testCaseCount.toStringSub
     ).mkString(" ")
 
     def toCSV: String = Seq(
@@ -149,6 +157,7 @@ object Stats {
       branchCov,
       instructionCov,
       cyclomaticCxty,
+      failedTestCaseCount.toStringSub,
       testCaseCount.toStringSub,
       timelimit.toString
     ).mkString("\t")
@@ -165,7 +174,11 @@ object Stats {
 
       (Seq(proj.projectDir) ++
         cmSeq ++
-        Seq(testCaseCount.toStringSub, timelimit.toString)
+        Seq(
+          failedTestCaseCount.toStringSub,
+          testCaseCount.toStringSub,
+          timelimit.toString
+        )
       ) mkString("\t")
     }
   }
@@ -253,20 +266,28 @@ object Stats {
   def jacocoReport(f: File): Option[Elem] = {
     /**
       * Extends coverage information from a JaCoCo report with the
-      * number of test cases executed.
+      * number of failed test cases and the total number of test cases
+      * executed.
       */
     def extendedReport: Elem = {
       val report = MyXML.loadFile(f)
       val counters = report \ "counter"
+      val failedTestCaseCount = tcCountFromFile(new File(
+        // dropRight(2) drops the jacoco-site/report.xml part
+        (f.getPath.split("/").dropRight(2) ++ Seq("failed-test-case-count.txt"))
+          .mkString("/")
+      ))
       val testCaseCount = tcCountFromFile(new File(
         // dropRight(2) drops the jacoco-site/report.xml part
         (f.getPath.split("/").dropRight(2) ++ Seq("test-case-count.txt"))
           .mkString("/")
       ))
+      val failedTcCounter = <counter type={FailedTestCaseCount.toString} missed="0"
+        covered={failedTestCaseCount.toString}/>: Node
       val tcCounter = <counter type={TestCaseCount.toString} missed="0"
         covered={testCaseCount.toString}/>: Node
 
-      <report>{counters ++ tcCounter}</report>
+      <report>{counters ++ failedTcCounter ++ tcCounter}</report>
     }
 
     try Some(extendedReport) catch { case _: Throwable => None }
@@ -350,6 +371,10 @@ object Stats {
             cyclomaticCxty = covMap.getOrElse(
               CyclomaticComplexity, CovMetric(0, 0)
             ),
+            failedTestCaseCount = covMap.getOrElse(
+              FailedTestCaseCount,
+              CovMetric(0, 0)
+            ).copy(total = 1), // needed so we can add up multiple executions
             testCaseCount = covMap.getOrElse(
               TestCaseCount,
               CovMetric(0, 0)
@@ -428,7 +453,7 @@ object Stats {
         }
       } else {
         // Print the header first
-        println("benchmark\tbranch\tinstruction\tcyclomatic\ttests\ttimelimit")
+        println("benchmark\tbranch\tinstruction\tcyclomatic\tftests\ttests\ttimelimit")
         val statsToString: BenchmarkStats => String =
           if (csvFlag) _.toCSV
           else         _.toCSVsub
