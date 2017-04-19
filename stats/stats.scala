@@ -42,7 +42,13 @@ object Stats {
   case object FailedTestCaseCount extends CovType {
     override def toString = "FTCCOUNT"
   }
-  case object TestCaseCount extends CovType {
+  case object RandoopTestCaseCount extends CovType {
+    override def toString = "RTCCOUNT"
+  }
+  case object JDartTestCaseCount extends CovType {
+    override def toString = "JTCCOUNT"
+  }
+  case object TotalTestCaseCount extends CovType {
     override def toString = "TCCOUNT"
   }
   // The method and class coverage types are used only to obtain the
@@ -59,7 +65,9 @@ object Stats {
     BranchCov,
     CyclomaticComplexity,
     FailedTestCaseCount,
-    TestCaseCount
+    RandoopTestCaseCount,
+    JDartTestCaseCount,
+    TotalTestCaseCount
   )
 
   val overviewCovTypes = Set[CovType](
@@ -118,13 +126,15 @@ object Stats {
   type Time = Int
 
   case class BenchmarkStats(
-    proj:                SF110Project,
-    branchCov:           CovMetric,
-    instructionCov:      CovMetric,
-    cyclomaticCxty:      CovMetric,
-    failedTestCaseCount: CovMetric,
-    testCaseCount:       CovMetric,
-    timelimit:           Time
+    proj:                 SF110Project,
+    branchCov:            CovMetric,
+    instructionCov:       CovMetric,
+    cyclomaticCxty:       CovMetric,
+    failedTestCaseCount:  CovMetric,
+    randoopTestCaseCount: CovMetric,
+    jdartTestCaseCount:   CovMetric,
+    testCaseCount:        CovMetric,
+    timelimit:            Time
   ) extends Ordered[BenchmarkStats] {
     def +(that: BenchmarkStats): BenchmarkStats = {
       require(proj == that.proj && timelimit == that.timelimit)
@@ -135,6 +145,8 @@ object Stats {
         instructionCov + that.instructionCov,
         cyclomaticCxty + that.cyclomaticCxty,
         failedTestCaseCount + that.failedTestCaseCount,
+        randoopTestCaseCount + that.randoopTestCaseCount,
+        jdartTestCaseCount + that.jdartTestCaseCount,
         testCaseCount + that.testCaseCount,
         timelimit
       )
@@ -149,6 +161,8 @@ object Stats {
       "instr",     "=", instructionCov + ",",
       "cxty",      "=", cyclomaticCxty + ",",
       "# f tests", "=", failedTestCaseCount.toStringSub,
+      "# r tests", "=", randoopTestCaseCount.toStringSub,
+      "# j tests", "=", jdartTestCaseCount.toStringSub,
       "# tests",   "=", testCaseCount.toStringSub
     ).mkString(" ")
 
@@ -158,6 +172,8 @@ object Stats {
       instructionCov,
       cyclomaticCxty,
       failedTestCaseCount.toStringSub,
+      randoopTestCaseCount.toStringSub,
+      jdartTestCaseCount.toStringSub,
       testCaseCount.toStringSub,
       timelimit.toString
     ).mkString("\t")
@@ -176,6 +192,8 @@ object Stats {
         cmSeq ++
         Seq(
           failedTestCaseCount.toStringSub,
+          randoopTestCaseCount.toStringSub,
+          jdartTestCaseCount.toStringSub,
           testCaseCount.toStringSub,
           timelimit.toString
         )
@@ -266,28 +284,33 @@ object Stats {
   def jacocoReport(f: File): Option[Elem] = {
     /**
       * Extends coverage information from a JaCoCo report with the
-      * number of failed test cases and the total number of test cases
+      * number of failed, randoop, jdart, and total test cases
       * executed.
       */
     def extendedReport: Elem = {
+
+      def countToXMLCounter(cType: CovType, countFileName: String): Node = {
+        val c = tcCountFromFile(new File(
+          (f.getPath.split("/").dropRight(2) ++ Seq(countFileName))
+            .mkString("/"))
+        )
+        <counter type={cType.toString} missed="0" covered={c.toString}/>: Node
+      }
+
       val report = MyXML.loadFile(f)
       val counters = report \ "counter"
-      val failedTestCaseCount = tcCountFromFile(new File(
-        // dropRight(2) drops the jacoco-site/report.xml part
-        (f.getPath.split("/").dropRight(2) ++ Seq("failed-test-case-count.txt"))
-          .mkString("/")
-      ))
-      val testCaseCount = tcCountFromFile(new File(
-        // dropRight(2) drops the jacoco-site/report.xml part
-        (f.getPath.split("/").dropRight(2) ++ Seq("test-case-count.txt"))
-          .mkString("/")
-      ))
-      val failedTcCounter = <counter type={FailedTestCaseCount.toString} missed="0"
-        covered={failedTestCaseCount.toString}/>: Node
-      val tcCounter = <counter type={TestCaseCount.toString} missed="0"
-        covered={testCaseCount.toString}/>: Node
+      val testCaseCountTypeMap = Map[CovType, String](
+        FailedTestCaseCount  -> "failed-test-case-count.txt",
+        RandoopTestCaseCount -> "randoop-test-case-count.txt",
+        JDartTestCaseCount   -> "jdart-test-case-count.txt",
+        TotalTestCaseCount   -> "test-case-count.txt"
+      )
 
-      <report>{counters ++ failedTcCounter ++ tcCounter}</report>
+      val testCaseCounts = for {
+        kv <- testCaseCountTypeMap
+      } yield countToXMLCounter(kv._1, kv._2)
+
+      <report>{counters ++ testCaseCounts.toSeq}</report>
     }
 
     try Some(extendedReport) catch { case _: Throwable => None }
@@ -375,8 +398,16 @@ object Stats {
               FailedTestCaseCount,
               CovMetric(0, 0)
             ).copy(total = 1), // needed so we can add up multiple executions
+            randoopTestCaseCount = covMap.getOrElse(
+              RandoopTestCaseCount,
+              CovMetric(0, 0)
+            ).copy(total = 1), // needed so we can add up multiple executions
+            jdartTestCaseCount = covMap.getOrElse(
+              JDartTestCaseCount,
+              CovMetric(0, 0)
+            ).copy(total = 1), // needed so we can add up multiple executions
             testCaseCount = covMap.getOrElse(
-              TestCaseCount,
+              TotalTestCaseCount,
               CovMetric(0, 0)
             ).copy(total = 1), // needed so we can add up multiple executions
             timelimit = extTimelimit(f)
@@ -453,7 +484,8 @@ object Stats {
         }
       } else {
         // Print the header first
-        println("benchmark\tbranch\tinstruction\tcyclomatic\tftests\ttests\ttimelimit")
+        println("benchmark\tbranch\tinstruction\tcyclomatic" +
+          "\tftests\trtests\tjtests\ttests\ttimelimit")
         val statsToString: BenchmarkStats => String =
           if (csvFlag) _.toCSV
           else         _.toCSVsub
