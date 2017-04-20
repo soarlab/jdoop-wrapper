@@ -1,0 +1,41 @@
+# This is an ns script for jdoop-wrapper used in Emulab
+
+set ns [new Simulator]
+source tb_compat.tcl
+set maxnodes 20
+set lanstr ""
+for {set i 1} {$i <= $maxnodes} {incr i} {
+    set node($i) [$ns node]
+    append lanstr "$node($i) "
+    tb-set-hardware $node($i) d430
+    tb-set-node-os $node($i) UBUNTU16-64-STD:12
+}
+
+# Put all the nodes in a lan
+set big-lan [$ns make-lan "$lanstr" 10Gb 0ms]
+
+# Local (ephemeral) storage
+for {set i 1} {$i <= $maxnodes} {incr i} {
+    set ls($i) [$ns blockstore]
+    $ls($i) set-class "local"
+    $ls($i) set-placement "sysvol"
+    $ls($i) set-mount-point "/mnt/scratch"
+    $ls($i) set-node $node($i)
+}
+
+# Persistent storage
+for {set i 1} {$i <= $maxnodes} {incr i} {
+    set bs($i) [$ns blockstore]
+    $bs($i) set-lease "JPF-Doop/sf110-$i"
+    $bs($i) set-node $node($i)
+    $bs($i) set-mount-point "/mnt/storage"
+}
+
+# Mega storage
+set ms1 [$ns blockstore]
+$ms1 set-lease "JPF-Doop/sf110-1-extended"
+$ms1 set-node $node(1)
+$ms1 set-mount-point "/mnt/mega"
+
+# Go!
+$ns run
