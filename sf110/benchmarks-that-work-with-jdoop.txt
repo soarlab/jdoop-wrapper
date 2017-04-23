@@ -48,7 +48,6 @@
 80_wheelwebtool
 82_ipcalculator
 84_ifx-framework
-88_jopenchart
 89_jiggler
 90_dcparseargs
 91_classviewer
