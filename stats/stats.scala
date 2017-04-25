@@ -92,6 +92,9 @@ object Stats {
       covered.map{ c => (c - coveredAvg) * (c - coveredAvg) }.sum /
         covered.length
     )
+    lazy val ratioStdDev: Double =
+      if (total == 0 || covered.sum == 0) 0.0 else stdDev / coveredAvg
+    lazy val percentageStdDev: Double = 100.0 * ratioStdDev
 
     def toStringSub: String = Seq(
       "%.1f".format(coveredAvg),
@@ -179,24 +182,33 @@ object Stats {
     ).mkString("\t")
 
     def toCSVsub: String = {
-      def metricToSubString(cm: CovMetric): String =
-        cm.toStringSub + " " + cm.toPercentage
+      val fmt: Double => String = x => "%.1f".format(x)
 
-      val cmSeq = Seq(
-        branchCov,
-        instructionCov,
-        cyclomaticCxty
-      ) map metricToSubString
+      def avgNDevPerct(cm: CovMetric): Seq[String] = Seq(
+        cm.coveredAvg,
+        cm.percentageAvg,
+        cm.stdDev,
+        cm.percentageStdDev
+      ) map fmt
+
+      def avgNDev(cm: CovMetric): Seq[String] = Seq(
+        cm.coveredAvg,
+        cm.stdDev
+      ) map fmt
 
       (Seq(proj.projectDir) ++
-        cmSeq ++
         Seq(
-          failedTestCaseCount.toStringSub,
-          randoopTestCaseCount.toStringSub,
-          jdartTestCaseCount.toStringSub,
-          testCaseCount.toStringSub,
-          timelimit.toString
-        )
+          branchCov,
+          instructionCov,
+          cyclomaticCxty
+        ).map{avgNDevPerct}.flatten ++
+        Seq(
+          failedTestCaseCount,
+          randoopTestCaseCount,
+          jdartTestCaseCount,
+          testCaseCount
+        ).map{avgNDev}.flatten ++
+        Seq(timelimit.toString)
       ) mkString("\t")
     }
   }
@@ -449,13 +461,13 @@ object Stats {
 
   def main(args: Array[String]): Unit = {
     val flags = Map(
-      "csv"    -> "--csv",
+      // "csv"    -> "--csv",
       "csvSub" -> "--csvsub",
       "total"  -> "--total"
     )
     if (args.length == 0) usage()
 
-    val csvFlag    = args(0) == flags("csv")
+    // val csvFlag    = args(0) == flags("csv")
     val csvSubFlag = args(0) == flags("csvSub")
     val totalFlag  = args(0) == flags("total")
     val dirs       = args
@@ -476,7 +488,7 @@ object Stats {
     else {
       val stats = run(dirs)
 
-      if (!csvFlag && !csvSubFlag) {
+      if (!csvSubFlag) {
         stats foreach { case (t, set) =>
           println(s"Timelimit: $t")
           println("Results:")
@@ -484,11 +496,21 @@ object Stats {
         }
       } else {
         // Print the header first
-        println("benchmark\tbranch\tinstruction\tcyclomatic" +
-          "\tftests\trtests\tjtests\ttests\ttimelimit")
-        val statsToString: BenchmarkStats => String =
-          if (csvFlag) _.toCSV
-          else         _.toCSVsub
+        println("benchmark" +
+          "\tbranch\tbranch_p" +
+          "\tbranch_sd\tbranch_sdp" +
+          "\tinstruction\tinstruction_p" +
+          "\tinstruction_sd\tinstruction_sdp" +
+          "\tcyclomatic\tcyclomatic_p" +
+          "\tcyclomatic_sd\tcyclomatic_sdp" +
+          "\tftests\tftests_sd" +
+          "\trtests\trtests_sd" +
+          "\tjtests\tjtests_sd" +
+          "\ttests\ttests_sd" +
+          "\ttimelimit")
+        val statsToString: BenchmarkStats => String = _.toCSVsub
+          // if (csvFlag) _.toCSV
+          // else         _.toCSVsub
         stats foreach { case (_, set) =>
           set.toSeq.sorted.foreach{b => println(statsToString(b))}
         }
