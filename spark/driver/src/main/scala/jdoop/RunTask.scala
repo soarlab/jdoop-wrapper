@@ -294,7 +294,8 @@ object RunTask {
       "--hamcrest-path", s"$toolDir/lib/hamcrest-core-1.3.jar",
       "--randoop-path", s"$toolDir/lib/randoop.jar",
       "--jacoco-path", s"$toolDir/lib/jacocoant.jar",
-      "--generate-report"
+      "--generate-report",
+      "--benchmark-id", task.project.projectDir
     ) ++
     (if (dependencyLibs != "") Seq("--classpath", dependencyLibs) else Seq())
 
