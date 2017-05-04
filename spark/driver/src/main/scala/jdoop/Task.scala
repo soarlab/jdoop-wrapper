@@ -38,6 +38,7 @@ case class Task(
     */
   def compare(that: Task): Int =
     (project.projectDir, that.project.projectDir) match {
+      case ("2_a4j", _)          => -1
       case ("1_tullibee", _)     => -1
       case ("6_jnfe", _)         => -1
       case ("23_jwbf", _)        => -1
@@ -46,6 +47,7 @@ case class Task(
       case ("31_xisemele", _)    => -1
       case ("22_byuic", _)       => -1
 
+      case (_, "2_a4j")          => 1
       case (_, "1_tullibee")     => 1
       case (_, "6_jnfe")         => 1
       case (_, "23_jwbf")        => 1
