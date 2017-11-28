@@ -28,7 +28,7 @@ object Stats {
 
   case class SF110Project(projectDir: String)
 
-  trait CovType
+  sealed trait CovType
 
   case object BranchCov extends CovType {
     override def toString = "BRANCH"
